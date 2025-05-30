@@ -7,7 +7,7 @@ name = "SysY-Rust-Hyjing"
 version = "0.1.0"
 dependencies = [
  "lalrpop",
- "lalrpop-util 0.19.12",
+ "lalrpop-util",
 ]
 
 [[package]]
@@ -189,7 +189,7 @@ dependencies = [
  "bit-set",
  "ena",
  "itertools",
- "lalrpop-util 0.22.2",
+ "lalrpop-util",
  "petgraph",
  "pico-args",
  "regex",
@@ -199,15 +199,6 @@ dependencies = [
  "term",
  "unicode-xid",
  "walkdir",
-]
-
-[[package]]
-name = "lalrpop-util"
-version = "0.19.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3c48237b9604c5a4702de6b824e02006c3214327564636aef27c1028a8fa0ed"
-dependencies = [
- "regex",
 ]
 
 [[package]]
