@@ -3,8 +3,8 @@ grammar;
 match {
     r"\s*" => {},
     r"//[^\n\r]*[\n\r]*" => {},
-    r"/\*.*?\*/" => {},
-    -
+    r"/\*.*\*/" => {},
+    _
 }
 
 pub CompUnit: String = <func_def: FuncDef> => func_def;
