@@ -1,8 +1,9 @@
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
-use std::fs::read_to_string;
+use std::fs::{self, read_to_string};
 use std::io::Result;
 mod ast;
+mod ir_gen;
 
 // 引用 lalrpop 生成的解析器
 lalrpop_mod!(sysy);
@@ -14,7 +15,7 @@ fn main() -> Result<()> {
     let _mode = args.next().unwrap();
     let input = args.next().unwrap();
     args.next();
-    let _output = args.next().unwrap();
+    let outfile = args.next().unwrap();
 
     // 读取输入文件
     let input = read_to_string(input)?;
@@ -23,6 +24,10 @@ fn main() -> Result<()> {
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
 
     // 输出解析得到的 AST
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
+
+    let koopa_ir = ir_gen::ast2ir(&ast);
+    // println!("IR code:\n{}", koopa_ir);
+    fs::write(outfile, koopa_ir)?;
     Ok(())
 }
