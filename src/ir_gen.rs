@@ -5,6 +5,6 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
         FuncType::Int => "i32",
         _ => "unknown",
     };
-    let out = format!("fun @{}: {} {{\n%entry:\nret {}\n}}", &ast.func_def.ident, func_type, ast.func_def.block.stmt.num);
+    let out = format!("fun @{}(): {} {{\n%entry:\nret {}\n}}", &ast.func_def.ident, func_type, ast.func_def.block.stmt.num);
     out
 }
