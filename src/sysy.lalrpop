@@ -2,8 +2,8 @@ grammar;
 
 match {
     r"\s*" => {},
-    r"//[^\n\r]*[\n\r]*" => {},
-    r"/\*.*\*/" => {},
+    r"//[^\n\r]*[\n\r]*" => {},  // comment for one line like //....
+    r"/\*.*\*/" => {},  // comment for multi line like /*....*/ (actually not true here because it uses greedy match)
     _
 }
 
