@@ -20,7 +20,7 @@ pub fn ir2riscv(ir: String) -> String {
         let func_data = program.func(func);
         out += &format!(".global {}\n", &func_data.name().to_string()[1..]);
         out += &format!("{}:\n", &func_data.name().to_string()[1..]);
-        for (&bb, node) in func_data.layout().bbs() {
+        for (&_, node) in func_data.layout().bbs() {
             for &inst in node.insts().keys() {
                 let value_data = func_data.dfg().value(inst);
                 out += &stmt2str(func_data, value_data);
