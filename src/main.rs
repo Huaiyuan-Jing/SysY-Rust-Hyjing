@@ -3,7 +3,7 @@ use std::env::args;
 use std::fs::{self, read_to_string};
 use std::io::Result;
 mod ast;
-mod ir_gen;
+mod ir;
 
 // 引用 lalrpop 生成的解析器
 lalrpop_mod!(sysy);
@@ -12,7 +12,7 @@ fn main() -> Result<()> {
     // 解析命令行参数
     let mut args = args();
     args.next();
-    let _mode = args.next().unwrap();
+    let mode = args.next().unwrap();
     let input = args.next().unwrap();
     args.next();
     let outfile = args.next().unwrap();
@@ -25,9 +25,15 @@ fn main() -> Result<()> {
 
     // 输出解析得到的 AST
     // println!("{:#?}", ast);
-
-    let koopa_ir = ir_gen::ast2ir(&ast);
-    // println!("IR code:\n{}", koopa_ir);
-    fs::write(outfile, koopa_ir)?;
+    let koopa_ir = ir::ast2ir(&ast);
+    if mode == "-koopa" {
+        fs::write(outfile, koopa_ir)?;
+        return Ok(());
+    }
+    let riscv = ir::ir2riscv(koopa_ir);
+    if mode == "-riscv" {
+        fs::write(outfile, riscv)?;
+        return Ok(());
+    }
     Ok(())
 }
