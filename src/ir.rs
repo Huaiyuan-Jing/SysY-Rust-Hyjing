@@ -36,7 +36,7 @@ fn stmt2str(
     match value_data.kind() {
         koopa::ir::ValueKind::Integer(int) => int.value().to_string(),
         koopa::ir::ValueKind::Return(ret) => {
-            let tmp = (*func_data.dfg().value(ret.value().unwrap())).clone(); 
+            let tmp = (*func_data.dfg().value(ret.value().unwrap())).clone();
             format!("li a0, {}\nret\n", stmt2str(func_data, &tmp))
         }
         _ => unreachable!(),
