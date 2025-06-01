@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt };
+use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp };
 grammar;
 
 match {
@@ -20,7 +20,7 @@ FuncType: FuncType = "int" => FuncType::Int;
 
 Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
-Stmt: Stmt = "return" <num: Number> ";" => Stmt { <> };
+Stmt: Stmt = "return" <exp: Expr> ";" => Stmt { <> };
 
 Number: i32 = <num: IntConst> => <>;
 
@@ -31,3 +31,20 @@ IntConst: i32 = {
     r"0[0-7]*" => i32::from_str_radix(<>, 8).unwrap(),
     r"0[xX][0-9a-fA-F]+" => i32::from_str_radix(&<>[2..], 16).unwrap(),
 }
+
+Expr: Expr = <exp: UnaryExp> => <>;
+
+UnaryExp: Expr = {
+    <e: PrimaryExp> => e,
+    <op: UnaryOp> <expr: UnaryExp> => Expr::UnaryExpr(op, Box::new(expr)),
+};
+
+PrimaryExp: Expr = {
+    "(" <e:Expr> ")" => e,
+    <n:Number> => Expr::Number(n)
+};
+
+UnaryOp: UnaryOp = {
+    "+" => UnaryOp::Plus,
+    "-" => UnaryOp::Minus,
+};

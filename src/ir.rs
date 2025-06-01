@@ -5,11 +5,12 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
         FuncType::Int => "i32",
     };
-    let out = format!(
-        "fun @{}(): {} {{\n%entry:\nret {}\n}}",
-        &ast.func_def.ident, func_type, ast.func_def.block.stmt.num
-    );
-    out
+    // let out = format!(
+    //     "fun @{}(): {} {{\n%entry:\nret {}\n}}",
+    //     &ast.func_def.ident, func_type, ast.func_def.block.stmt.num
+    // // );
+    // out
+    "".to_string()
 }
 pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();

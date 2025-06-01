@@ -22,6 +22,18 @@ pub struct Block {
 
 #[derive(Debug)]
 pub struct Stmt {
-    pub num: i32,
+    pub exp: Expr,
 }
 
+#[derive(Debug)]
+pub enum Expr {
+    Number(i32),
+    UnaryExpr(UnaryOp, Box<Expr>)
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    Plus,
+    Minus,
+    Not,
+}
