@@ -1,16 +1,50 @@
 use crate::ast::{self, FuncType};
 use koopa;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+lazy_static! {
+    static ref COUNTER: Mutex<i32> = Mutex::new(-1);
+}
 pub fn ast2ir(ast: &ast::CompUnit) -> String {
-    // 生成 IR 代码
     let func_type = match ast.func_def.func_type {
         FuncType::Int => "i32",
     };
-    // let out = format!(
-    //     "fun @{}(): {} {{\n%entry:\nret {}\n}}",
-    //     &ast.func_def.ident, func_type, ast.func_def.block.stmt.num
-    // // );
-    // out
-    "".to_string()
+    let mut out = format!("fun @{}(): {} {{\n%entry:\n", &ast.func_def.ident, func_type);
+    let tmp = expr2ir(&ast.func_def.block.stmt.exp);
+    out += &format!("{}ret %{}\n", tmp.0, tmp.1);
+    out += "}\n";
+    out
+}
+fn expr2ir(exp: &ast::Expr) -> (String, i32) {
+    println!("{:?}", exp);
+    match exp {
+        ast::Expr::Number(n) => {
+            let mut counter = COUNTER.lock().unwrap();
+            *counter += 1;
+            (format!("%{} = {}\n", *counter, n), *counter)
+        }
+        ast::Expr::UnaryExpr(op, expr) => {
+            let out = expr2ir(expr);
+            let mut counter = COUNTER.lock().unwrap();
+            match op {
+                ast::UnaryOp::Not => {
+                    *counter += 1;
+                    (
+                        format!("{}%{} = eq %{}, 0\n", out.0, *counter, out.1),
+                        *counter,
+                    )
+                }
+                ast::UnaryOp::Minus => {
+                    *counter += 1;
+                    (
+                        format!("{}%{} = sub 0, %{}\n", out.0, *counter, out.1),
+                        *counter,
+                    )
+                }
+                ast::UnaryOp::Plus => (out.0, out.1),
+            }
+        }
+    }
 }
 pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();

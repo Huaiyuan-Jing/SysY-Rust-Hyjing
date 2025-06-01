@@ -47,4 +47,5 @@ PrimaryExp: Expr = {
 UnaryOp: UnaryOp = {
     "+" => UnaryOp::Plus,
     "-" => UnaryOp::Minus,
+    "!" => UnaryOp::Not,
 };
