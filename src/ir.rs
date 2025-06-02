@@ -20,30 +20,73 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
 }
 fn expr2ir(exp: &ast::Expr) -> (String, i32) {
     match exp {
-        ast::Expr::Number(n) => {
-            let mut counter = COUNTER.lock().unwrap();
-            *counter += 1;
-            (format!("%{} = add 0, {}\n", *counter, n), *counter)
-        }
+        ast::Expr::Number(n) => (String::new(), *n),
         ast::Expr::UnaryExpr(op, expr) => {
             let out = expr2ir(expr);
             let mut counter = COUNTER.lock().unwrap();
+            let pos = if out.0 == "".to_string() {
+                out.1.to_string()
+            } else {
+                format!("%{}", out.1)
+            };
             match op {
                 ast::UnaryOp::Not => {
                     *counter += 1;
                     (
-                        format!("{}%{} = eq 0, %{}\n", out.0, *counter, out.1),
+                        format!("{}%{} = eq 0, {}\n", out.0, *counter, pos),
                         *counter,
                     )
                 }
                 ast::UnaryOp::Minus => {
                     *counter += 1;
                     (
-                        format!("{}%{} = sub 0, %{}\n", out.0, *counter, out.1),
+                        format!("{}%{} = sub 0, {}\n", out.0, *counter, pos),
                         *counter,
                     )
                 }
                 ast::UnaryOp::Plus => (out.0, out.1),
+            }
+        }
+        ast::Expr::AddExpr(lhs, op, rhs) => {
+            let lout = expr2ir(lhs);
+            let lpos = if lout.0 == String::new() {lout.1.to_string()} else {format!("%{}", lout.1)};
+            let rout = expr2ir(rhs);
+            let rpos = if rout.0 == String::new() {rout.1.to_string()} else {format!("%{}", rout.1)};
+            let mut out = format!("{}{}", lout.0, rout.0);
+            let mut counter = COUNTER.lock().unwrap();
+            *counter += 1;
+            match op {
+                ast::AddOp::Plus => {
+                    out += &format!("%{} = add {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::AddOp::Minus => {
+                    out += &format!("%{} = sub {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+            }
+        }
+        ast::Expr::MulExpr(lhs, op, rhs) => {
+            let lout = expr2ir(lhs);
+            let lpos = if lout.0 == String::new() {lout.1.to_string()} else {format!("%{}", lout.1)};
+            let rout = expr2ir(rhs);
+            let rpos = if rout.0 == String::new() {rout.1.to_string()} else {format!("%{}", rout.1)};
+            let mut out = format!("{}{}", lout.0, rout.0);
+            let mut counter = COUNTER.lock().unwrap();
+            *counter += 1;
+            match op {
+                ast::MulOp::Multiply => {
+                    out += &format!("%{} = mul {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::MulOp::Divide => {
+                    out += &format!("%{} = div {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::MulOp::Modulo => {
+                    out += &format!("%{} = mod {}, {}\n", counter, lpos, rpos);
+                    (out, *counter) 
+                }
             }
         }
     }
@@ -75,6 +118,7 @@ fn stmt2str(
     reg_map: &mut HashMap<koopa::ir::Value, String>,
     reg_count: &mut usize,
 ) -> String {
+    println!("{:?}", func_data.dfg().value(*value).kind());
     match func_data.dfg().value(*value).kind() {
         koopa::ir::ValueKind::Integer(int) => {
             if int.value() == 0 {
@@ -125,9 +169,9 @@ fn stmt2str(
                     );
                     out
                 }
-                _ => unreachable!(),
+                _ => String::new(),
             }
         }
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }

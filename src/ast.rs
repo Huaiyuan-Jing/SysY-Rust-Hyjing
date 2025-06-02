@@ -28,7 +28,9 @@ pub struct Stmt {
 #[derive(Debug)]
 pub enum Expr {
     Number(i32),
-    UnaryExpr(UnaryOp, Box<Expr>)
+    UnaryExpr(UnaryOp, Box<Expr>),
+    AddExpr(Box<Expr>, AddOp, Box<Expr>),
+    MulExpr(Box<Expr>, MulOp, Box<Expr>),
 }
 
 #[derive(Debug)]
@@ -36,4 +38,17 @@ pub enum UnaryOp {
     Plus,
     Minus,
     Not,
+}
+
+#[derive(Debug)]
+pub enum AddOp {
+    Plus,
+    Minus,
+}
+
+#[derive(Debug)]
+pub enum MulOp {
+    Multiply,
+    Divide,
+    Modulo,
 }

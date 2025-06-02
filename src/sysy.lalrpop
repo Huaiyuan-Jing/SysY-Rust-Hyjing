@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp };
+use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, AddOp, MulOp };
 grammar;
 
 match {
@@ -32,7 +32,7 @@ IntConst: i32 = {
     r"0[xX][0-9a-fA-F]+" => i32::from_str_radix(&<>[2..], 16).unwrap(),
 }
 
-Expr: Expr = <exp: UnaryExp> => <>;
+Expr: Expr = <exp: AddExp> => <>;
 
 UnaryExp: Expr = {
     <e: PrimaryExp> => e,
@@ -49,3 +49,24 @@ UnaryOp: UnaryOp = {
     "-" => UnaryOp::Minus,
     "!" => UnaryOp::Not,
 };
+
+AddExp: Expr = {
+    <mulexpr: MulExp> => <>,
+    <addexpr: AddExp> <addop: AddOp> <mulexpr: MulExp> => Expr::AddExpr(Box::new(addexpr), addop, Box::new(mulexpr)),
+};
+
+AddOp: AddOp = {
+    "+" => AddOp::Plus,
+    "-" => AddOp::Minus,
+};
+
+MulExp: Expr = {
+    <unaryexpr: UnaryExp> => <>,
+    <mulexpr: MulExp> <mulop: MulOp> <unaryexpr: UnaryExp> => Expr::MulExpr(Box::new(mulexpr), mulop, Box::new(unaryexpr)),
+};
+
+MulOp: MulOp = {
+    "*" => MulOp::Multiply,
+    "/" => MulOp::Divide,
+    "%" => MulOp::Modulo,
+}
