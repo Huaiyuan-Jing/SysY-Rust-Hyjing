@@ -19,16 +19,15 @@ fn main() -> Result<()> {
 
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
 
-    println!("{:#?}", ast);
     let koopa_ir = ir::ast2ir(&ast);
     if mode == "-koopa" {
         fs::write(outfile, koopa_ir)?;
         return Ok(());
     }
-    // let riscv = ir::ir2riscv(koopa_ir);
-    // if mode == "-riscv" {
-    //     fs::write(outfile, riscv)?;
-    //     return Ok(());
-    // }
+    let riscv = ir::ir2riscv(koopa_ir);
+    if mode == "-riscv" {
+        fs::write(outfile, riscv)?;
+        return Ok(());
+    }
     Ok(())
 }
