@@ -105,6 +105,7 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                 }
             }
         }
+        _ => unreachable!()
     }
 }
 pub fn ir2riscv(ir: String) -> String {

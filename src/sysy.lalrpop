@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, AddOp, MulOp };
+use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, AddOp, MulOp, RelOp, EqOp, LogicOp };
 grammar;
 
 match {
@@ -32,7 +32,7 @@ IntConst: i32 = {
     r"0[xX][0-9a-fA-F]+" => i32::from_str_radix(&<>[2..], 16).unwrap(),
 }
 
-Expr: Expr = <exp: AddExp> => <>;
+Expr: Expr = <exp: LOrExp> => <>;
 
 UnaryExp: Expr = {
     <e: PrimaryExp> => e,
@@ -69,4 +69,32 @@ MulOp: MulOp = {
     "*" => MulOp::Multiply,
     "/" => MulOp::Divide,
     "%" => MulOp::Modulo,
+}
+
+LOrExp: Expr = {
+    <l_and_exp: LAndExp> => <>,
+    <l_or_exp: LOrExp> "||" <l_and_exp: LAndExp> => Expr::LogicExpr(Box::new(l_or_exp), LogicOp::Or, Box::new(l_and_exp)),
+}
+
+LAndExp: Expr = {
+    <eq_exp: EqExp> => <>,
+    <l_and_exp: LAndExp> "&&" <eq_exp: EqExp> => Expr::LogicExpr(Box::new(l_and_exp), LogicOp::And, Box::new(eq_exp)),
+}
+
+EqExp: Expr = {
+    <rel_exp: RelExp> => <>,
+    <eq_exp: EqExp> "==" <rel_exp: RelExp> => Expr::EqExpr(Box::new(eq_exp), EqOp::Eq, Box::new(rel_exp)),
+    <eq_exp: EqExp> "!=" <rel_exp: RelExp> => Expr::EqExpr(Box::new(eq_exp), EqOp::Neq, Box::new(rel_exp)), 
+}
+
+RelExp: Expr = {
+    <add_exp: AddExp> => <>,
+    <rel_exp: RelExp> <rel_op: RelOp> <add_exp: AddExp> => Expr::RelExpr(Box::new(rel_exp), rel_op, Box::new(add_exp)),
+}
+
+RelOp: RelOp = {
+    "<" => RelOp::Less,
+    "<=" => RelOp::LessOrEqual,
+    ">" => RelOp::Greater,
+    ">=" => RelOp::GreaterOrEqual,
 }

@@ -31,6 +31,9 @@ pub enum Expr {
     UnaryExpr(UnaryOp, Box<Expr>),
     AddExpr(Box<Expr>, AddOp, Box<Expr>),
     MulExpr(Box<Expr>, MulOp, Box<Expr>),
+    RelExpr(Box<Expr>, RelOp, Box<Expr>),
+    EqExpr(Box<Expr>, EqOp, Box<Expr>),
+    LogicExpr(Box<Expr>, LogicOp, Box<Expr>),
 }
 
 #[derive(Debug)]
@@ -51,4 +54,24 @@ pub enum MulOp {
     Multiply,
     Divide,
     Modulo,
+}
+
+#[derive(Debug)]
+pub enum RelOp {
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+}
+
+#[derive(Debug)]
+pub enum EqOp {
+    Eq,
+    Neq,
+}
+
+#[derive(Debug)]
+pub enum LogicOp {
+    And,
+    Or,
 }
