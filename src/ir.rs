@@ -49,9 +49,17 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
         }
         ast::Expr::AddExpr(lhs, op, rhs) => {
             let lout = expr2ir(lhs);
-            let lpos = if lout.0 == String::new() {lout.1.to_string()} else {format!("%{}", lout.1)};
+            let lpos = if lout.0 == String::new() {
+                lout.1.to_string()
+            } else {
+                format!("%{}", lout.1)
+            };
             let rout = expr2ir(rhs);
-            let rpos = if rout.0 == String::new() {rout.1.to_string()} else {format!("%{}", rout.1)};
+            let rpos = if rout.0 == String::new() {
+                rout.1.to_string()
+            } else {
+                format!("%{}", rout.1)
+            };
             let mut out = format!("{}{}", lout.0, rout.0);
             let mut counter = COUNTER.lock().unwrap();
             *counter += 1;
@@ -68,9 +76,17 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
         }
         ast::Expr::MulExpr(lhs, op, rhs) => {
             let lout = expr2ir(lhs);
-            let lpos = if lout.0 == String::new() {lout.1.to_string()} else {format!("%{}", lout.1)};
+            let lpos = if lout.0 == String::new() {
+                lout.1.to_string()
+            } else {
+                format!("%{}", lout.1)
+            };
             let rout = expr2ir(rhs);
-            let rpos = if rout.0 == String::new() {rout.1.to_string()} else {format!("%{}", rout.1)};
+            let rpos = if rout.0 == String::new() {
+                rout.1.to_string()
+            } else {
+                format!("%{}", rout.1)
+            };
             let mut out = format!("{}{}", lout.0, rout.0);
             let mut counter = COUNTER.lock().unwrap();
             *counter += 1;
@@ -85,7 +101,7 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                 }
                 ast::MulOp::Modulo => {
                     out += &format!("%{} = mod {}, {}\n", counter, lpos, rpos);
-                    (out, *counter) 
+                    (out, *counter)
                 }
             }
         }
@@ -156,22 +172,29 @@ fn stmt2str(
             match bin.op() {
                 koopa::ir::BinaryOp::Add => {
                     out += &format!("add {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
-                    out
                 }
                 koopa::ir::BinaryOp::Sub => {
                     out += &format!("sub {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
-                    out
                 }
                 koopa::ir::BinaryOp::Eq => {
                     out += &format!(
                         "xor {}, {}, {}\nseqz {}, {}\n",
                         dest_reg, lhs_reg, rhs_reg, dest_reg, dest_reg
                     );
-                    out
                 }
-                _ => String::new(),
+                koopa::ir::BinaryOp::Mul => {
+                    out += &format!("mul {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                koopa::ir::BinaryOp::Div => {
+                    out += &format!("div {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                koopa::ir::BinaryOp::Mod => {
+                    out += &format!("rem {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                _ => unreachable!(),
             }
+            out
         }
-        _ => String::new(),
+        _ => unreachable!(),
     }
 }
