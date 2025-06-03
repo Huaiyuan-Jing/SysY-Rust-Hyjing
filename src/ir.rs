@@ -1,7 +1,7 @@
 use crate::ast::{self, FuncType};
 use koopa;
 use lazy_static::lazy_static;
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, fmt::format, sync::Mutex};
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
 }
@@ -14,7 +14,8 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
         &ast.func_def.ident, func_type
     );
     let tmp = expr2ir(&ast.func_def.block.stmt.exp);
-    out += &format!("{}ret %{}\n", tmp.0, tmp.1);
+    let pos = if tmp.0 == String::new() {tmp.1.to_string()} else {format!("%{}", tmp.1)};
+    out += &format!("{}ret {}\n", tmp.0, pos);
     out += "}\n";
     out
 }
@@ -47,7 +48,7 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                 ast::UnaryOp::Plus => (out.0, out.1),
             }
         }
-        ast::Expr::AddExpr(lhs, op, rhs) => {
+        ast::Expr::BinaryExpr(lhs, op, rhs) => {
             let lout = expr2ir(lhs);
             let lpos = if lout.0 == String::new() {
                 lout.1.to_string()
@@ -64,48 +65,74 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
             let mut counter = COUNTER.lock().unwrap();
             *counter += 1;
             match op {
-                ast::AddOp::Plus => {
+                ast::BinaryOp::Plus => {
                     out += &format!("%{} = add {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-                ast::AddOp::Minus => {
+                ast::BinaryOp::Minus => {
                     out += &format!("%{} = sub {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-            }
-        }
-        ast::Expr::MulExpr(lhs, op, rhs) => {
-            let lout = expr2ir(lhs);
-            let lpos = if lout.0 == String::new() {
-                lout.1.to_string()
-            } else {
-                format!("%{}", lout.1)
-            };
-            let rout = expr2ir(rhs);
-            let rpos = if rout.0 == String::new() {
-                rout.1.to_string()
-            } else {
-                format!("%{}", rout.1)
-            };
-            let mut out = format!("{}{}", lout.0, rout.0);
-            let mut counter = COUNTER.lock().unwrap();
-            *counter += 1;
-            match op {
-                ast::MulOp::Multiply => {
+                ast::BinaryOp::Multiply => {
                     out += &format!("%{} = mul {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-                ast::MulOp::Divide => {
+                ast::BinaryOp::Divide => {
                     out += &format!("%{} = div {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-                ast::MulOp::Modulo => {
+                ast::BinaryOp::Modulo => {
                     out += &format!("%{} = mod {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
+                ast::BinaryOp::Eq => {
+                    out += &format!("%{} = eq {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::Neq => {
+                    out += &format!("%{} = ne {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::Less => {
+                    out += &format!("%{} = lt {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::LessOrEqual => {
+                    out += &format!("%{} = le {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::Greater => {
+                    out += &format!("%{} = lt {}, {}\n", counter, rpos, lpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::GreaterOrEqual => {
+                    out += &format!("%{} = le {}, {}\n", counter, rpos, lpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::And => {
+                    out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
+                    let lpos = format!("%{}", *counter);
+                    *counter += 1;
+                    out += &format!("%{} = ne {}, {}\n", counter, 0, rpos);
+                    let rpos = format!("%{}", *counter);
+                    *counter += 1;
+                    out += &format!("%{} = and {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                ast::BinaryOp::Or => {
+                    out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
+                    let lpos = format!("%{}", *counter);
+                    *counter += 1;
+                    out += &format!("%{} = ne {}, {}\n", counter, 0, rpos);
+                    let rpos = format!("%{}", *counter);
+                    *counter += 1;
+                    out += &format!("%{} = or {}, {}\n", counter, lpos, rpos);
+                    (out, *counter)
+                }
+                _ => unreachable!(),
             }
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 pub fn ir2riscv(ir: String) -> String {
@@ -183,6 +210,12 @@ fn stmt2str(
                         dest_reg, lhs_reg, rhs_reg, dest_reg, dest_reg
                     );
                 }
+                koopa::ir::BinaryOp::NotEq => {
+                    out += &format!(
+                        "xor {}, {}, {}\nsnez {}, {}\n",
+                        dest_reg, lhs_reg, rhs_reg, dest_reg, dest_reg
+                    );
+                }
                 koopa::ir::BinaryOp::Mul => {
                     out += &format!("mul {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
                 }
@@ -192,7 +225,20 @@ fn stmt2str(
                 koopa::ir::BinaryOp::Mod => {
                     out += &format!("rem {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
                 }
-                _ => unreachable!(),
+                koopa::ir::BinaryOp::Lt => {
+                    out += &format!("slt {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                koopa::ir::BinaryOp::And => {
+                    out += &format!("and {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                koopa::ir::BinaryOp::Or => {
+                    out += &format!("or {}, {}, {}\n", dest_reg, lhs_reg, rhs_reg);
+                }
+                koopa::ir::BinaryOp::Le => {
+                    out += &format!("slt {}, {}, {}\n", dest_reg, rhs_reg, lhs_reg);
+                    out += &format!("xori {}, {}, 1\n", dest_reg, dest_reg);
+                }
+                _ => unreachable!()
             }
             out
         }

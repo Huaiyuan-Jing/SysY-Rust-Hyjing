@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, AddOp, MulOp, RelOp, EqOp, LogicOp };
+use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, BinaryOp };
 grammar;
 
 match {
@@ -52,49 +52,49 @@ UnaryOp: UnaryOp = {
 
 AddExp: Expr = {
     <mulexpr: MulExp> => <>,
-    <addexpr: AddExp> <addop: AddOp> <mulexpr: MulExp> => Expr::AddExpr(Box::new(addexpr), addop, Box::new(mulexpr)),
+    <addexpr: AddExp> <addop: AddOp> <mulexpr: MulExp> => Expr::BinaryExpr(Box::new(addexpr), addop, Box::new(mulexpr)),
 };
 
-AddOp: AddOp = {
-    "+" => AddOp::Plus,
-    "-" => AddOp::Minus,
+AddOp: BinaryOp = {
+    "+" => BinaryOp::Plus,
+    "-" => BinaryOp::Minus,
 };
 
 MulExp: Expr = {
     <unaryexpr: UnaryExp> => <>,
-    <mulexpr: MulExp> <mulop: MulOp> <unaryexpr: UnaryExp> => Expr::MulExpr(Box::new(mulexpr), mulop, Box::new(unaryexpr)),
+    <mulexpr: MulExp> <mulop: MulOp> <unaryexpr: UnaryExp> => Expr::BinaryExpr(Box::new(mulexpr), mulop, Box::new(unaryexpr)),
 };
 
-MulOp: MulOp = {
-    "*" => MulOp::Multiply,
-    "/" => MulOp::Divide,
-    "%" => MulOp::Modulo,
+MulOp: BinaryOp = {
+    "*" => BinaryOp::Multiply,
+    "/" => BinaryOp::Divide,
+    "%" => BinaryOp::Modulo,
 }
 
 LOrExp: Expr = {
     <l_and_exp: LAndExp> => <>,
-    <l_or_exp: LOrExp> "||" <l_and_exp: LAndExp> => Expr::LogicExpr(Box::new(l_or_exp), LogicOp::Or, Box::new(l_and_exp)),
+    <l_or_exp: LOrExp> "||" <l_and_exp: LAndExp> => Expr::BinaryExpr(Box::new(l_or_exp), BinaryOp::Or, Box::new(l_and_exp)),
 }
 
 LAndExp: Expr = {
     <eq_exp: EqExp> => <>,
-    <l_and_exp: LAndExp> "&&" <eq_exp: EqExp> => Expr::LogicExpr(Box::new(l_and_exp), LogicOp::And, Box::new(eq_exp)),
+    <l_and_exp: LAndExp> "&&" <eq_exp: EqExp> => Expr::BinaryExpr(Box::new(l_and_exp), BinaryOp::And, Box::new(eq_exp)),
 }
 
 EqExp: Expr = {
     <rel_exp: RelExp> => <>,
-    <eq_exp: EqExp> "==" <rel_exp: RelExp> => Expr::EqExpr(Box::new(eq_exp), EqOp::Eq, Box::new(rel_exp)),
-    <eq_exp: EqExp> "!=" <rel_exp: RelExp> => Expr::EqExpr(Box::new(eq_exp), EqOp::Neq, Box::new(rel_exp)), 
+    <eq_exp: EqExp> "==" <rel_exp: RelExp> => Expr::BinaryExpr(Box::new(eq_exp), BinaryOp::Eq, Box::new(rel_exp)),
+    <eq_exp: EqExp> "!=" <rel_exp: RelExp> => Expr::BinaryExpr(Box::new(eq_exp), BinaryOp::Neq, Box::new(rel_exp)), 
 }
 
 RelExp: Expr = {
     <add_exp: AddExp> => <>,
-    <rel_exp: RelExp> <rel_op: RelOp> <add_exp: AddExp> => Expr::RelExpr(Box::new(rel_exp), rel_op, Box::new(add_exp)),
+    <rel_exp: RelExp> <rel_op: RelOp> <add_exp: AddExp> => Expr::BinaryExpr(Box::new(rel_exp), rel_op, Box::new(add_exp)),
 }
 
-RelOp: RelOp = {
-    "<" => RelOp::Less,
-    "<=" => RelOp::LessOrEqual,
-    ">" => RelOp::Greater,
-    ">=" => RelOp::GreaterOrEqual,
+RelOp: BinaryOp = {
+    "<" => BinaryOp::Less,
+    "<=" => BinaryOp::LessOrEqual,
+    ">" => BinaryOp::Greater,
+    ">=" => BinaryOp::GreaterOrEqual,
 }

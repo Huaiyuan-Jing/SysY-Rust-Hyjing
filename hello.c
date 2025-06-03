@@ -1,6 +1,4 @@
 int main()
 {
-    /*This is comment as well*/
-    // This is comment
-    return (1 <= 2) != (3 + -1 > 4);
+  return 1 + 2 * (!3 || 4) < 5 != 6 && -7;
 }

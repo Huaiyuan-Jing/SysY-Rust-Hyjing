@@ -29,11 +29,24 @@ pub struct Stmt {
 pub enum Expr {
     Number(i32),
     UnaryExpr(UnaryOp, Box<Expr>),
-    AddExpr(Box<Expr>, AddOp, Box<Expr>),
-    MulExpr(Box<Expr>, MulOp, Box<Expr>),
-    RelExpr(Box<Expr>, RelOp, Box<Expr>),
-    EqExpr(Box<Expr>, EqOp, Box<Expr>),
-    LogicExpr(Box<Expr>, LogicOp, Box<Expr>),
+    BinaryExpr(Box<Expr>, BinaryOp, Box<Expr>),
+}
+
+#[derive(Debug)]
+pub enum BinaryOp {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Modulo,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    Eq,
+    Neq,
+    And,
+    Or,
 }
 
 #[derive(Debug)]
@@ -41,37 +54,4 @@ pub enum UnaryOp {
     Plus,
     Minus,
     Not,
-}
-
-#[derive(Debug)]
-pub enum AddOp {
-    Plus,
-    Minus,
-}
-
-#[derive(Debug)]
-pub enum MulOp {
-    Multiply,
-    Divide,
-    Modulo,
-}
-
-#[derive(Debug)]
-pub enum RelOp {
-    Less,
-    LessOrEqual,
-    Greater,
-    GreaterOrEqual,
-}
-
-#[derive(Debug)]
-pub enum EqOp {
-    Eq,
-    Neq,
-}
-
-#[derive(Debug)]
-pub enum LogicOp {
-    And,
-    Or,
 }
