@@ -1,4 +1,5 @@
 fun @main(): i32 {
 %entry:
-ret 2
+%0 = add 2, 6
+ret %0
 }
