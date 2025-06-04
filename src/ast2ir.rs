@@ -1,27 +1,129 @@
-use crate::ast::{self, FuncType};
+use crate::ast::{self, BlockItem, FuncType};
 use lazy_static::lazy_static;
-use std::sync::Mutex;
+use std::{collections::HashMap, sync::Mutex};
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
+    static ref CONST_TABLE: Mutex<HashMap<String, i32>> = Mutex::new(HashMap::new());
 }
-// pub fn ast2ir(ast: &ast::CompUnit) -> String {
-//     let func_type = match ast.func_def.func_type {
-//         FuncType::Int => "i32",
-//     };
-//     let mut out = format!(
-//         "fun @{}(): {} {{\n%entry:\n",
-//         &ast.func_def.ident, func_type
-//     );
-//     let tmp = expr2ir(&ast.func_def.block.stmt.exp);
-//     let pos = if tmp.0 == String::new() {
-//         tmp.1.to_string()
-//     } else {
-//         format!("%{}", tmp.1)
-//     };
-//     out += &format!("{}ret {}\n", tmp.0, pos);
-//     out += "}\n";
-//     out
-// }
+pub fn ast2ir(ast: &ast::CompUnit) -> String {
+    let func_type = match ast.func_def.func_type {
+        FuncType::Int => "i32",
+    };
+    let mut out = format!(
+        "fun @{}(): {} {{\n%entry:\n",
+        &ast.func_def.ident, func_type
+    );
+    for item in &ast.func_def.block.items {
+        match item {
+            BlockItem::ConstDecl(clist) => {
+                for c in clist {
+                    let id = c.id.clone();
+                    let val = compute_expr(&c.value);
+                    let mut const_table = CONST_TABLE.lock().unwrap();
+                    const_table.insert(id, val);
+                }
+            }
+            BlockItem::Stmt(s) => {
+                let (command, pos) = expr2ir(&s.exp);
+                let pos = if command == String::new() {pos.to_string()} else {format!("%{}", pos)};
+                out = format!("{}{}", out, command);
+                out += &format!("ret {}\n", pos);
+            },
+        }
+    }
+    out += "}\n";
+    out
+}
+fn compute_expr(expr: &ast::Expr) -> i32 {
+    match expr {
+        ast::Expr::Number(n) => *n,
+        ast::Expr::UnaryExpr(op, expr) => {
+            let out = compute_expr(expr.as_ref());
+            match op {
+                ast::UnaryOp::Not => {
+                    if out == 0 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::UnaryOp::Plus => out,
+                ast::UnaryOp::Minus => -out,
+            }
+        }
+        ast::Expr::BinaryExpr(lhs, op, rhs) => {
+            let lhs_val = compute_expr(lhs.as_ref());
+            let rhs_val = compute_expr(rhs.as_ref());
+            match op {
+                ast::BinaryOp::Plus => lhs_val + rhs_val,
+                ast::BinaryOp::Minus => lhs_val - rhs_val,
+                ast::BinaryOp::Multiply => lhs_val * rhs_val,
+                ast::BinaryOp::Divide => lhs_val / rhs_val,
+                ast::BinaryOp::Modulo => lhs_val % rhs_val,
+                ast::BinaryOp::Less => {
+                    if lhs_val < rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::Greater => {
+                    if lhs_val > rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::LessOrEqual => {
+                    if lhs_val <= rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::GreaterOrEqual => {
+                    if lhs_val >= rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::Eq => {
+                    if lhs_val == rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::Neq => {
+                    if lhs_val != rhs_val {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::And => {
+                    if lhs_val != 0 && rhs_val != 0 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                ast::BinaryOp::Or => {
+                    if lhs_val != 0 || rhs_val != 0 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+            }
+        }
+        ast::Expr::LVal(lval) => {
+            let const_table = CONST_TABLE.lock().unwrap();
+            const_table.get(lval).unwrap().clone()
+        }
+    }
+}
 fn expr2ir(exp: &ast::Expr) -> (String, i32) {
     match exp {
         ast::Expr::Number(n) => (String::new(), *n),
@@ -134,6 +236,10 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                 }
                 _ => unreachable!(),
             }
+        }
+        ast::Expr::LVal(lval) => {
+            let const_table = CONST_TABLE.lock().unwrap();
+            (String::new(), const_table.get(lval).unwrap().clone())
         }
         _ => unreachable!(),
     }
