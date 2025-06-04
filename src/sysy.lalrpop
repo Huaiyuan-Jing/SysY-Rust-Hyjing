@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, FuncType, Stmt, Expr, UnaryOp, BinaryOp };
+use crate::ast::{CompUnit, FuncDef, Block, BlockItem, FuncType, Stmt, Expr, UnaryOp, BinaryOp, ConstDef };
 grammar;
 
 match {
@@ -18,7 +18,47 @@ FuncDef: FuncDef = {
 
 FuncType: FuncType = "int" => FuncType::Int;
 
-Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
+Block: Block = "{" <items: Repeat<BlockItem>> "}" => {
+    Block { items: items }
+};
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Repeat<T>: Vec<T> = {
+    <mut v:(<T>)*> => v
+};
+
+BlockItem: BlockItem = {
+    <s: Stmt> => BlockItem::Stmt(s),
+    <c: Decl> => BlockItem::ConstDecl(c),
+};
+
+Decl: Vec<ConstDef> = <ConstDecl> => <>;
+
+ConstDecl: Vec<ConstDef> = "const" <tp: BType> <mut l: Comma<ConstDef>> ";" => {
+    for i in 0..l.len() {
+        l[i].kind = tp.clone();
+    }
+    l
+};
+
+BType: String = "int" => "int".to_string();
+
+ConstDef: ConstDef = <id: Ident> "=" <val: ConstInitVal> => ConstDef { kind: String::new(), id: id, value: val };
+
+ConstInitVal: Expr = <e: ConstExp> => <>;
+
+ConstExp: Expr = <e: Expr> => <>;
+
+LVal: String = <id: Ident> => <>;
 
 Stmt: Stmt = "return" <exp: Expr> ";" => Stmt { <> };
 
@@ -41,7 +81,8 @@ UnaryExp: Expr = {
 
 PrimaryExp: Expr = {
     "(" <e:Expr> ")" => e,
-    <n:Number> => Expr::Number(n)
+    <n:Number> => Expr::Number(n),
+    <ident: Ident> => Expr::LVal(ident),
 };
 
 UnaryOp: UnaryOp = {

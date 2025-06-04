@@ -17,7 +17,13 @@ pub enum FuncType {
 
 #[derive(Debug)]
 pub struct Block {
-    pub stmt: Stmt,
+    pub items: Vec<BlockItem>,
+}
+
+#[derive(Debug)]
+pub enum BlockItem {
+    ConstDecl(Vec<ConstDef>),
+    Stmt(Stmt),
 }
 
 #[derive(Debug)]
@@ -30,6 +36,7 @@ pub enum Expr {
     Number(i32),
     UnaryExpr(UnaryOp, Box<Expr>),
     BinaryExpr(Box<Expr>, BinaryOp, Box<Expr>),
+    LVal(String),
 }
 
 #[derive(Debug)]
@@ -54,4 +61,11 @@ pub enum UnaryOp {
     Plus,
     Minus,
     Not,
+}
+
+#[derive(Debug)]
+pub struct ConstDef {
+    pub kind: String,
+    pub id: String,
+    pub value: Expr,
 }

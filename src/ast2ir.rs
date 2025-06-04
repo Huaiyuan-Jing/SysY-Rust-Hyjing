@@ -4,24 +4,24 @@ use std::sync::Mutex;
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
 }
-pub fn ast2ir(ast: &ast::CompUnit) -> String {
-    let func_type = match ast.func_def.func_type {
-        FuncType::Int => "i32",
-    };
-    let mut out = format!(
-        "fun @{}(): {} {{\n%entry:\n",
-        &ast.func_def.ident, func_type
-    );
-    let tmp = expr2ir(&ast.func_def.block.stmt.exp);
-    let pos = if tmp.0 == String::new() {
-        tmp.1.to_string()
-    } else {
-        format!("%{}", tmp.1)
-    };
-    out += &format!("{}ret {}\n", tmp.0, pos);
-    out += "}\n";
-    out
-}
+// pub fn ast2ir(ast: &ast::CompUnit) -> String {
+//     let func_type = match ast.func_def.func_type {
+//         FuncType::Int => "i32",
+//     };
+//     let mut out = format!(
+//         "fun @{}(): {} {{\n%entry:\n",
+//         &ast.func_def.ident, func_type
+//     );
+//     let tmp = expr2ir(&ast.func_def.block.stmt.exp);
+//     let pos = if tmp.0 == String::new() {
+//         tmp.1.to_string()
+//     } else {
+//         format!("%{}", tmp.1)
+//     };
+//     out += &format!("{}ret {}\n", tmp.0, pos);
+//     out += "}\n";
+//     out
+// }
 fn expr2ir(exp: &ast::Expr) -> (String, i32) {
     match exp {
         ast::Expr::Number(n) => (String::new(), *n),
@@ -132,9 +132,9 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                     out += &format!("%{} = or {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-                // _ => unreachable!(),
+                _ => unreachable!(),
             }
         }
-        // _ => unreachable!(),
+        _ => unreachable!(),
     }
 }

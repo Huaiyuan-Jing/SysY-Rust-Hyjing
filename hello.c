@@ -1,4 +1,5 @@
-int main()
-{
-  return 1 + 2 * (!3 || 4) < 5 != 6 && -7; // complicated expression`
+int main() {
+  const int x = 1 + 1;
+  const int y = 2 * 3;
+  return x;
 }
