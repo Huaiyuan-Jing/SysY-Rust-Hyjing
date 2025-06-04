@@ -234,13 +234,13 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                     out += &format!("%{} = or {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
                 }
-                _ => unreachable!(),
+                // _ => unreachable!(),
             }
         }
         ast::Expr::LVal(lval) => {
             let const_table = CONST_TABLE.lock().unwrap();
             (String::new(), const_table.get(lval).unwrap().clone())
         }
-        _ => unreachable!(),
+        // _ => unreachable!(),
     }
 }
