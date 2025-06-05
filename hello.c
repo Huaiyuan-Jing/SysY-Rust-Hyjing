@@ -1,5 +1,6 @@
-int main() {
-  const int x = 1 + 1;
-  const int y = x * 3;
-  return x + y;
+int main()
+{
+  int x = 10;
+  x = x + 1;
+  return x;
 }

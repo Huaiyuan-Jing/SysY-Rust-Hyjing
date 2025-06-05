@@ -1,4 +1,4 @@
-use crate::ast::{CompUnit, FuncDef, Block, BlockItem, FuncType, Stmt, Expr, UnaryOp, BinaryOp, ConstDef };
+use crate::ast::{CompUnit, FuncDef, Block, BlockItem, FuncType, Stmt, Expr, UnaryOp, BinaryOp, ConstDef, VarDef };
 grammar;
 
 match {
@@ -38,10 +38,9 @@ Repeat<T>: Vec<T> = {
 
 BlockItem: BlockItem = {
     <s: Stmt> => BlockItem::Stmt(s),
-    <c: Decl> => BlockItem::ConstDecl(c),
+    <c: ConstDecl> => BlockItem::ConstDecl(c),
+    <v: VarDecl> => BlockItem::VarDecl(v),
 };
-
-Decl: Vec<ConstDef> = <ConstDecl> => <>;
 
 ConstDecl: Vec<ConstDef> = "const" <tp: BType> <mut l: Comma<ConstDef>> ";" => {
     for i in 0..l.len() {
@@ -58,9 +57,26 @@ ConstInitVal: Expr = <e: ConstExp> => <>;
 
 ConstExp: Expr = <e: Expr> => <>;
 
+VarDecl: Vec<VarDef> = <tp: BType> <mut l: Comma<VarDef>> ";" => {
+    for i in 0..l.len() {
+        l[i].kind = tp.clone();
+    }
+    l
+};
+
+VarDef: VarDef = {
+    <id: LVal> => VarDef { kind: String::new(), id: id, value: None },
+    <id: LVal> "=" <value: InitVal> => VarDef {kind: String::new(), id: id, value: Some(value) },
+};
+
+InitVal: Expr = <e: Expr> => <>;
+
 LVal: String = <id: Ident> => <>;
 
-Stmt: Stmt = "return" <exp: Expr> ";" => Stmt { <> };
+Stmt: Stmt = {
+    "return" <e: Expr> ";" => Stmt::Ret(e),
+    <id: LVal> "=" <e: Expr> ";" => Stmt::Assign(id, e),
+};
 
 Number: i32 = <num: IntConst> => <>;
 

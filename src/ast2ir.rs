@@ -1,9 +1,13 @@
-use crate::ast::{self, BlockItem, FuncType};
+use crate::ast::{self, BlockItem, FuncType, Stmt};
 use lazy_static::lazy_static;
 use std::{collections::HashMap, sync::Mutex};
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
-    static ref CONST_TABLE: Mutex<HashMap<String, i32>> = Mutex::new(HashMap::new());
+    static ref ID_TABLE: Mutex<HashMap<String, IdElement>> = Mutex::new(HashMap::new());
+}
+enum IdElement {
+    Const(i32),
+    Var(String),
 }
 pub fn ast2ir(ast: &ast::CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
@@ -19,16 +23,51 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
                 for c in clist {
                     let id = c.id.clone();
                     let val = compute_expr(&c.value);
-                    let mut const_table = CONST_TABLE.lock().unwrap();
-                    const_table.insert(id, val);
+                    let mut id_table = ID_TABLE.lock().unwrap();
+                    id_table.insert(id, IdElement::Const(val));
                 }
             }
-            BlockItem::Stmt(s) => {
-                let (command, pos) = expr2ir(&s.exp);
-                let pos = if command == String::new() {pos.to_string()} else {format!("%{}", pos)};
-                out = format!("{}{}", out, command);
-                out += &format!("ret {}\n", pos);
+            BlockItem::VarDecl(vlsit) => {
+                for v in vlsit {
+                    let id = v.id.clone();
+                    out += &format!("@{} = alloc {}\n", id, "i32");
+                    if !v.value.is_none() {
+                        let tmp = expr2ir(&(v.value.as_ref()).unwrap());
+                        let pos = if tmp.0 == String::new() {
+                            tmp.1.to_string()
+                        } else {
+                            format!("%{}", tmp.1)
+                        };
+                        out += &tmp.0;
+                        out += &format!("store {}, @{}\n", pos, id);
+                    }
+                    let mut id_table = ID_TABLE.lock().unwrap();
+                    id_table.insert(id, IdElement::Var(String::from("i32")));
+                }
+            }
+            BlockItem::Stmt(s) => match s {
+                Stmt::Ret(e) => {
+                    let tmp = expr2ir(e);
+                    let pos = if tmp.0 == String::new() {
+                        tmp.1.to_string()
+                    } else {
+                        format!("%{}", tmp.1)
+                    };
+                    out += &tmp.0;
+                    out += &format!("ret {}\n", pos);
+                }
+                Stmt::Assign(id, e) => {
+                    let tmp = expr2ir(e);
+                    let pos = if tmp.0 == String::new() {
+                        tmp.1.to_string()
+                    } else {
+                        format!("%{}", tmp.1)
+                    };
+                    out += &tmp.0;
+                    out += &format!("store {}, @{}\n", pos, id);
+                }
             },
+            _ => unreachable!(),
         }
     }
     out += "}\n";
@@ -119,8 +158,11 @@ fn compute_expr(expr: &ast::Expr) -> i32 {
             }
         }
         ast::Expr::LVal(lval) => {
-            let const_table = CONST_TABLE.lock().unwrap();
-            const_table.get(lval).unwrap().clone()
+            let id_table = ID_TABLE.lock().unwrap();
+            match id_table.get(lval).unwrap() {
+                IdElement::Const(v) => *v,
+                _ => unreachable!(),
+            }
         }
     }
 }
@@ -233,14 +275,21 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
                     *counter += 1;
                     out += &format!("%{} = or {}, {}\n", counter, lpos, rpos);
                     (out, *counter)
-                }
-                // _ => unreachable!(),
+                } // _ => unreachable!(),
             }
         }
         ast::Expr::LVal(lval) => {
-            let const_table = CONST_TABLE.lock().unwrap();
-            (String::new(), const_table.get(lval).unwrap().clone())
-        }
-        // _ => unreachable!(),
+            let id_table = ID_TABLE.lock().unwrap();
+            let element = id_table.get(lval).unwrap();
+            match element {
+                IdElement::Const(val) => (String::new(), *val),
+                IdElement::Var(_) => {
+                    let mut counter = COUNTER.lock().unwrap();
+                    *counter += 1;
+                    let out = format!("%{} = load @{}\n", *counter, lval);
+                    (out, *counter)
+                }
+            }
+        } // _ => unreachable!(),
     }
 }

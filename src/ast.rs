@@ -23,12 +23,14 @@ pub struct Block {
 #[derive(Debug)]
 pub enum BlockItem {
     ConstDecl(Vec<ConstDef>),
+    VarDecl(Vec<VarDef>),
     Stmt(Stmt),
 }
 
 #[derive(Debug)]
-pub struct Stmt {
-    pub exp: Expr,
+pub enum Stmt {
+    Ret(Expr),
+    Assign(String, Expr),
 }
 
 #[derive(Debug)]
@@ -68,4 +70,11 @@ pub struct ConstDef {
     pub kind: String,
     pub id: String,
     pub value: Expr,
+}
+
+#[derive(Debug)]
+pub struct VarDef {
+    pub kind: String,
+    pub id: String,
+    pub value: Option<Expr>,
 }

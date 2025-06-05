@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     let input = read_to_string(input)?;
 
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
-    // println!("{:#?}", ast);
+    println!("{:#?}", ast);
     let koopa_ir = ast2ir::ast2ir(&ast);
     if mode == "-koopa" {
         fs::write(outfile, koopa_ir)?;
