@@ -37,7 +37,7 @@ Repeat<T>: Vec<T> = {
 };
 
 Opt<T>: Option<T> = {
-    <e:T?> => e,
+    <e:T> => Some(e),
     => None,
 }
 
@@ -82,7 +82,7 @@ Stmt: Stmt = {
     "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
     <id: LVal> "=" <e: Expr> ";" => Stmt::Assign(id, e),
     <e: Opt<Expr>> ";" => Stmt::Expr(e),
-    <block: Block> => Stmt::Block(block),
+    <block: Block> => Stmt::Block(Box::new(block)),
 };
 
 Number: i32 = <num: IntConst> => <>;
