@@ -29,8 +29,10 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum Stmt {
-    Ret(Expr),
+    Ret(Option<Expr>),
     Assign(String, Expr),
+    Block(Box<Block>),
+    Expr(Option<Expr>),
 }
 
 #[derive(Debug)]

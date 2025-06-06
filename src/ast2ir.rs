@@ -3,11 +3,14 @@ use lazy_static::lazy_static;
 use std::{collections::HashMap, sync::Mutex};
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
-    static ref ID_TABLE: Mutex<HashMap<String, IdElement>> = Mutex::new(HashMap::new());
 }
 enum IdElement {
     Const(i32),
     Var(String),
+}
+struct IpTable {
+    table:HashMap<String, IdElement>,
+    father: Option<Box<IpTable>>, 
 }
 pub fn ast2ir(ast: &ast::CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
@@ -17,7 +20,11 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
         "fun @{}(): {} {{\n%entry:\n",
         &ast.func_def.ident, func_type
     );
-    for item in &ast.func_def.block.items {
+    out += "}\n";
+    out
+}
+fn block2ir(block: &ast::Block) -> String {
+    for item in &block.items {
         match item {
             BlockItem::ConstDecl(clist) => {
                 for c in clist {
@@ -46,16 +53,21 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
                 }
             }
             BlockItem::Stmt(s) => match s {
-                Stmt::Ret(e) => {
-                    let tmp = expr2ir(e);
-                    let pos = if tmp.0 == String::new() {
-                        tmp.1.to_string()
-                    } else {
-                        format!("%{}", tmp.1)
-                    };
-                    out += &tmp.0;
-                    out += &format!("ret {}\n", pos);
-                }
+                Stmt::Ret(e) => match e {
+                    Some(e) => {
+                        let tmp = expr2ir(e);
+                        let pos = if tmp.0 == String::new() {
+                            tmp.1.to_string()
+                        } else {
+                            format!("%{}", tmp.1)
+                        };
+                        out += &tmp.0;
+                        out += &format!("ret {}\n", pos);
+                    }
+                    None => {
+                        out += "ret\n";
+                    }
+                },
                 Stmt::Assign(id, e) => {
                     let tmp = expr2ir(e);
                     let pos = if tmp.0 == String::new() {
@@ -66,12 +78,11 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
                     out += &tmp.0;
                     out += &format!("store {}, @{}\n", pos, id);
                 }
+                _ => todo!()
             },
             _ => unreachable!(),
         }
     }
-    out += "}\n";
-    out
 }
 fn compute_expr(expr: &ast::Expr) -> i32 {
     match expr {

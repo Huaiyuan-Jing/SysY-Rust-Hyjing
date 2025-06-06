@@ -36,6 +36,11 @@ Repeat<T>: Vec<T> = {
     <mut v:(<T>)*> => v
 };
 
+Opt<T>: Option<T> = {
+    <e:T?> => e,
+    => None,
+}
+
 BlockItem: BlockItem = {
     <s: Stmt> => BlockItem::Stmt(s),
     <c: ConstDecl> => BlockItem::ConstDecl(c),
@@ -74,8 +79,10 @@ InitVal: Expr = <e: Expr> => <>;
 LVal: String = <id: Ident> => <>;
 
 Stmt: Stmt = {
-    "return" <e: Expr> ";" => Stmt::Ret(e),
+    "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
     <id: LVal> "=" <e: Expr> ";" => Stmt::Assign(id, e),
+    <e: Opt<Expr>> ";" => Stmt::Expr(e),
+    <block: Block> => Stmt::Block(block),
 };
 
 Number: i32 = <num: IntConst> => <>;
