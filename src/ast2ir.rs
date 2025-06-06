@@ -8,9 +8,29 @@ enum IdElement {
     Const(i32),
     Var(String),
 }
-struct IpTable {
+struct IdTable {
     table:HashMap<String, IdElement>,
     father: Option<Box<IpTable>>, 
+}
+impl IdTable {
+    pub fn new(father: Option<Box<IpTable>>) -> Self {
+        IdTable {
+            table: HashMap::new(),
+            father: father,
+        }
+    }
+    pub fn insert(k: String, v: IdElement) -> bool {
+        self.table.insert(k, v).is_none()
+    }
+    pub fn get(k: &String) -> Option<&IdElement> {
+        if self.table.contains_key(k) {
+            Some(&self.table[k])
+        } else if self.father.is_some() {
+            self.father.as_ref().unwrap().get(k)
+        } else {
+            None
+        }
+    }
 }
 pub fn ast2ir(ast: &ast::CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
@@ -20,17 +40,18 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
         "fun @{}(): {} {{\n%entry:\n",
         &ast.func_def.ident, func_type
     );
+    out += &block2ir(&ast.func_def.block, &IdTable::new(None));
     out += "}\n";
     out
 }
-fn block2ir(block: &ast::Block) -> String {
+fn block2ir(block: &ast::Block, id_table: &IdTable) -> String {
+    let mut out = String::new();
     for item in &block.items {
         match item {
             BlockItem::ConstDecl(clist) => {
                 for c in clist {
                     let id = c.id.clone();
                     let val = compute_expr(&c.value);
-                    let mut id_table = ID_TABLE.lock().unwrap();
                     id_table.insert(id, IdElement::Const(val));
                 }
             }
@@ -48,7 +69,6 @@ fn block2ir(block: &ast::Block) -> String {
                         out += &tmp.0;
                         out += &format!("store {}, @{}\n", pos, id);
                     }
-                    let mut id_table = ID_TABLE.lock().unwrap();
                     id_table.insert(id, IdElement::Var(String::from("i32")));
                 }
             }
@@ -77,12 +97,22 @@ fn block2ir(block: &ast::Block) -> String {
                     };
                     out += &tmp.0;
                     out += &format!("store {}, @{}\n", pos, id);
+                },
+                Stmt::Expr(e) => match e {
+                    Some(e) => {
+                        out += &expr2ir(exp).0;
+                    }
+                    None => {}
                 }
+                Stmt::Block(b) => {
+                    out += &block2ir(b, &IdTable::new(Some(id_table)));
+                } 
                 _ => todo!()
             },
             _ => unreachable!(),
         }
     }
+    out
 }
 fn compute_expr(expr: &ast::Expr) -> i32 {
     match expr {
@@ -169,7 +199,6 @@ fn compute_expr(expr: &ast::Expr) -> i32 {
             }
         }
         ast::Expr::LVal(lval) => {
-            let id_table = ID_TABLE.lock().unwrap();
             match id_table.get(lval).unwrap() {
                 IdElement::Const(v) => *v,
                 _ => unreachable!(),
@@ -290,7 +319,6 @@ fn expr2ir(exp: &ast::Expr) -> (String, i32) {
             }
         }
         ast::Expr::LVal(lval) => {
-            let id_table = ID_TABLE.lock().unwrap();
             let element = id_table.get(lval).unwrap();
             match element {
                 IdElement::Const(val) => (String::new(), *val),
