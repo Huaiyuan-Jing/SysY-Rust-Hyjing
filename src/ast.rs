@@ -33,8 +33,7 @@ pub enum Stmt {
     Assign(String, Expr),
     Block(Box<Block>),
     Expr(Option<Expr>),
-    If(Expr, Box<Stmt>),
-    Else(Box<Stmt>),
+    IfElse(Expr, Box<Stmt>, Option<Box<Stmt>>),
 }
 
 #[derive(Debug)]

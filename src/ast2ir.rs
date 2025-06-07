@@ -56,10 +56,11 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
     out
 }
 fn block2ir(block: &ast::Block, id_table: &mut IdTable) -> String {
-    println!("Block: {}\n", id_table.offset);
+    // println!("Block: {}\n", id_table.offset);
     let mut out = String::new();
+    // let mut if_else_stack = Vec::new();
     for item in &block.items {
-        println!("{:#?}", item);
+        // println!("{:#?}", item);
         match item {
             BlockItem::ConstDecl(clist) => {
                 for c in clist {

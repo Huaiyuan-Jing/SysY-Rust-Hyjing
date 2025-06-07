@@ -1,10 +1,12 @@
-use crate::ast::{CompUnit, FuncDef, Block, BlockItem, FuncType, Stmt, Expr, UnaryOp, BinaryOp, ConstDef, VarDef };
+use crate::ast::*;
 grammar;
+
+
 
 match {
     r"\s*" => {},
     r"//[^\n\r]*[\n\r]*" => {},  // comment for one line like //....
-    r"/\*.*\*/" => {},  // comment for multi line like /*....*/ (actually not true here because it uses greedy match)
+    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => {}, // comment for multi line like /*....*/ (actually not true here because it uses greedy match)
     _
 }
 
@@ -79,13 +81,22 @@ InitVal: Expr = <e: Expr> => <>;
 LVal: String = <id: Ident> => <>;
 
 Stmt: Stmt = {
-    "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
+    <MatchedStmt> => <>,
+    <OpenStmt> => <>,
+};
+
+MatchedStmt: Stmt = {
     <id: LVal> "=" <e: Expr> ";" => Stmt::Assign(id, e),
     <e: Opt<Expr>> ";" => Stmt::Expr(e),
     <block: Block> => Stmt::Block(Box::new(block)),
-    "if" "(" <e:Expr> ")" <s: Stmt> => Stmt::If(e, Box::new(s)),
-    "else" <s: Stmt> => Stmt::Else(Box::new(s)),
-};
+    "if" "(" <condition: Expr> ")" <if_then: MatchedStmt> "else" <else_then: MatchedStmt> => Stmt::IfElse(condition, Box::new(if_then), Some(Box::new(else_then))),
+    "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
+}
+
+OpenStmt: Stmt = {
+    "if" "(" <condition: Expr> ")" <if_then: Stmt> => Stmt::IfElse(condition, Box::new(if_then), None),
+    "if" "(" <condition: Expr> ")" <if_then: MatchedStmt> "else" <el: OpenStmt> => Stmt::IfElse(condition, Box::new(if_then), Some(Box::new(el))),
+}
 
 Number: i32 = <num: IntConst> => <>;
 
