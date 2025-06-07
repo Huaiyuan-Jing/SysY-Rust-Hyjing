@@ -1,9 +1,10 @@
-use crate::ast::{self, BlockItem, FuncType, Stmt};
+use crate::ast::*;
 use lazy_static::lazy_static;
-use std::{collections::HashMap, fmt::format, sync::Mutex};
+use std::{collections::HashMap, sync::Mutex};
 lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
     static ref BLOCK_COUNTER: Mutex<i32> = Mutex::new(-1);
+    static ref IF_COUNTER: Mutex<i32> = Mutex::new(-1);
 }
 enum IdElement {
     Const(i32),
@@ -29,7 +30,10 @@ impl<'a> IdTable<'a> {
     }
     pub fn get(&self, k: &String) -> (Option<&IdElement>, String) {
         if self.table.contains_key(&format!("{}_{}", k, self.offset)) {
-            (Some(&self.table[&format!("{}_{}", k, self.offset)]), format!("{}_{}", k, self.offset))
+            (
+                Some(&self.table[&format!("{}_{}", k, self.offset)]),
+                format!("{}_{}", k, self.offset),
+            )
         } else if self.father.is_some() {
             self.father.as_ref().unwrap().get(k)
         } else {
@@ -37,7 +41,7 @@ impl<'a> IdTable<'a> {
         }
     }
 }
-pub fn ast2ir(ast: &ast::CompUnit) -> String {
+pub fn ast2ir(ast: &CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
         FuncType::Int => "i32",
     };
@@ -55,7 +59,88 @@ pub fn ast2ir(ast: &ast::CompUnit) -> String {
     out += "}\n";
     out
 }
-fn block2ir(block: &ast::Block, id_table: &mut IdTable) -> String {
+fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
+    let mut out = String::new();
+    match stmt {
+        Stmt::Ret(e) => match e {
+            Some(e) => {
+                let tmp = expr2ir(e, id_table);
+                let pos = if tmp.0 == String::new() {
+                    tmp.1.to_string()
+                } else {
+                    format!("%{}", tmp.1)
+                };
+                out += &tmp.0;
+                out += &format!("ret {}\n", pos);
+            }
+            None => {
+                out += "ret\n";
+            }
+        },
+        Stmt::Assign(id, e) => {
+            let id = id_table.get(id);
+            if id.0.is_none() {
+                panic!("Unable to Find Variable");
+            }
+            match id.0.unwrap() {
+                IdElement::Var(_) => {}
+                _ => panic!("assign to non-variable"),
+            }
+            let id = id.1;
+            let tmp = expr2ir(e, id_table);
+            let pos = if tmp.0 == String::new() {
+                tmp.1.to_string()
+            } else {
+                format!("%{}", tmp.1)
+            };
+            out += &tmp.0;
+            out += &format!("store {}, @{}\n", pos, id);
+        }
+        Stmt::Expr(e) => match e {
+            Some(e) => {
+                out += &expr2ir(e, id_table).0;
+            }
+            None => {}
+        },
+        Stmt::Block(b) => {
+            let id = {
+                let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
+                *counter_guard += 1;
+                counter_guard.clone()
+            };
+            let mut table = IdTable::new(Some(id_table), id);
+            out += &block2ir(b, &mut table);
+        }
+        Stmt::IfElse(cond, if_then, else_then) => {
+            let tmp= expr2ir(cond, id_table);
+            out += &tmp.0;
+            let cond = if tmp.0 == String::new() {
+                tmp.1.to_string()
+            } else {
+                format!("%{}", tmp.1)
+            };
+            let id = {
+                let mut counter_guard = IF_COUNTER.lock().unwrap();
+                *counter_guard += 1;
+                counter_guard.clone()
+            };
+            out += &format!("br {}, %then_{}, %else_{}\n", cond, id, id);
+            out += &format!("%then_{},\n", id);
+            out += &stmt2ir(if_then, id_table);
+            out += &format!("%jump %end_{},\n", id);
+            out += &format!("%else_{},\n", id);
+            match else_then {
+                Some(else_then) => out += &stmt2ir(else_then, id_table),
+                None => {}
+            }
+            out += &format!("%jump %end_{},\n", id);
+            out += &format!("%end_{}\n", id);
+        }
+        _ => todo!(),
+    }
+    out
+}
+fn block2ir(block: &Block, id_table: &mut IdTable) -> String {
     // println!("Block: {}\n", id_table.offset);
     let mut out = String::new();
     // let mut if_else_stack = Vec::new();
@@ -86,139 +171,90 @@ fn block2ir(block: &ast::Block, id_table: &mut IdTable) -> String {
                     id_table.insert(id, IdElement::Var(String::from("i32")));
                 }
             }
-            BlockItem::Stmt(s) => match s {
-                Stmt::Ret(e) => match e {
-                    Some(e) => {
-                        let tmp = expr2ir(e, id_table);
-                        let pos = if tmp.0 == String::new() {
-                            tmp.1.to_string()
-                        } else {
-                            format!("%{}", tmp.1)
-                        };
-                        out += &tmp.0;
-                        out += &format!("ret {}\n", pos);
-                    }
-                    None => {
-                        out += "ret\n";
-                    }
-                },
-                Stmt::Assign(id, e) => {
-                    let id = id_table.get(id);
-                    if id.0.is_none() {
-                        panic!("Unable to Find Variable");
-                    }
-                    match id.0.unwrap() {
-                        IdElement::Var(_) => {},
-                        _ => panic!("assign to non-variable"),
-                    }
-                    let id = id.1;
-                    let tmp = expr2ir(e, id_table);
-                    let pos = if tmp.0 == String::new() {
-                        tmp.1.to_string()
-                    } else {
-                        format!("%{}", tmp.1)
-                    };
-                    out += &tmp.0;
-                    out += &format!("store {}, @{}\n", pos, id);
-                }
-                Stmt::Expr(e) => match e {
-                    Some(e) => {
-                        out += &expr2ir(e, id_table).0;
-                    }
-                    None => {}
-                },
-                Stmt::Block(b) => {
-                    let id = {
-                        let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
-                        *counter_guard += 1;
-                        counter_guard.clone()
-                    };
-                    let mut table = IdTable::new(Some(id_table), id);
-                    out += &block2ir(b, &mut table);
-                }
-                _ => todo!(),
-            },
+            BlockItem::Stmt(s) => {
+                out += &stmt2ir(s, id_table);
+            }
             _ => unreachable!(),
         }
     }
     out
 }
-fn compute_expr(expr: &ast::Expr, id_table: &IdTable) -> i32 {
+fn compute_expr(expr: &Expr, id_table: &IdTable) -> i32 {
     match expr {
-        ast::Expr::Number(n) => *n,
-        ast::Expr::UnaryExpr(op, expr) => {
+        Expr::Number(n) => *n,
+        Expr::UnaryExpr(op, expr) => {
             let out = compute_expr(expr.as_ref(), id_table);
             match op {
-                ast::UnaryOp::Not => {
+                UnaryOp::Not => {
                     if out == 0 {
                         1
                     } else {
                         0
                     }
                 }
-                ast::UnaryOp::Plus => out,
-                ast::UnaryOp::Minus => -out,
+                UnaryOp::Plus => out,
+                UnaryOp::Minus => -out,
             }
         }
-        ast::Expr::BinaryExpr(lhs, op, rhs) => {
+        Expr::BinaryExpr(lhs, op, rhs) => {
             let lhs_val = compute_expr(lhs.as_ref(), id_table);
             let rhs_val = compute_expr(rhs.as_ref(), id_table);
             match op {
-                ast::BinaryOp::Plus => lhs_val + rhs_val,
-                ast::BinaryOp::Minus => lhs_val - rhs_val,
-                ast::BinaryOp::Multiply => lhs_val * rhs_val,
-                ast::BinaryOp::Divide => lhs_val / rhs_val,
-                ast::BinaryOp::Modulo => lhs_val % rhs_val,
-                ast::BinaryOp::Less => {
+                BinaryOp::Plus => lhs_val + rhs_val,
+                BinaryOp::Minus => lhs_val - rhs_val,
+                BinaryOp::Multiply => lhs_val * rhs_val,
+                BinaryOp::Divide => lhs_val / rhs_val,
+                BinaryOp::Modulo => lhs_val % rhs_val,
+                BinaryOp::Less => {
                     if lhs_val < rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::Greater => {
+                BinaryOp::Greater => {
                     if lhs_val > rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::LessOrEqual => {
+                BinaryOp::LessOrEqual => {
                     if lhs_val <= rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::GreaterOrEqual => {
+                BinaryOp::GreaterOrEqual => {
                     if lhs_val >= rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::Eq => {
+                BinaryOp::Eq => {
                     if lhs_val == rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::Neq => {
+                BinaryOp::Neq => {
                     if lhs_val != rhs_val {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::And => {
+                BinaryOp::And => {
                     if lhs_val != 0 && rhs_val != 0 {
                         1
                     } else {
                         0
                     }
                 }
-                ast::BinaryOp::Or => {
+                BinaryOp::Or => {
                     if lhs_val != 0 || rhs_val != 0 {
                         1
                     } else {
@@ -227,7 +263,7 @@ fn compute_expr(expr: &ast::Expr, id_table: &IdTable) -> i32 {
                 }
             }
         }
-        ast::Expr::LVal(lval) => {
+        Expr::LVal(lval) => {
             let out = id_table.get(lval);
             if out.0.is_none() {
                 panic!("Unable to Find Value")
@@ -239,11 +275,11 @@ fn compute_expr(expr: &ast::Expr, id_table: &IdTable) -> i32 {
         }
     }
 }
-fn expr2ir(exp: &ast::Expr, id_table: &IdTable) -> (String, i32) {
+fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
     // println!("{:#?}", exp);
     match exp {
-        ast::Expr::Number(n) => (String::new(), *n),
-        ast::Expr::UnaryExpr(op, expr) => {
+        Expr::Number(n) => (String::new(), *n),
+        Expr::UnaryExpr(op, expr) => {
             let out = expr2ir(expr, id_table);
             let mut counter = COUNTER.lock().unwrap();
             *counter += 1;
@@ -254,14 +290,12 @@ fn expr2ir(exp: &ast::Expr, id_table: &IdTable) -> (String, i32) {
                 format!("%{}", out.1)
             };
             match op {
-                ast::UnaryOp::Not => (format!("{}%{} = eq 0, {}\n", out.0, counter, pos), counter),
-                ast::UnaryOp::Minus => {
-                    (format!("{}%{} = sub 0, {}\n", out.0, counter, pos), counter)
-                }
-                ast::UnaryOp::Plus => (out.0, out.1),
+                UnaryOp::Not => (format!("{}%{} = eq 0, {}\n", out.0, counter, pos), counter),
+                UnaryOp::Minus => (format!("{}%{} = sub 0, {}\n", out.0, counter, pos), counter),
+                UnaryOp::Plus => (out.0, out.1),
             }
         }
-        ast::Expr::BinaryExpr(lhs, op, rhs) => {
+        Expr::BinaryExpr(lhs, op, rhs) => {
             let lout = expr2ir(lhs, id_table);
             let lpos = if lout.0 == String::new() {
                 lout.1.to_string()
@@ -279,51 +313,51 @@ fn expr2ir(exp: &ast::Expr, id_table: &IdTable) -> (String, i32) {
             *counter += 1;
             let counter = counter.clone();
             match op {
-                ast::BinaryOp::Plus => {
+                BinaryOp::Plus => {
                     out += &format!("%{} = add {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Minus => {
+                BinaryOp::Minus => {
                     out += &format!("%{} = sub {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Multiply => {
+                BinaryOp::Multiply => {
                     out += &format!("%{} = mul {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Divide => {
+                BinaryOp::Divide => {
                     out += &format!("%{} = div {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Modulo => {
+                BinaryOp::Modulo => {
                     out += &format!("%{} = mod {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Eq => {
+                BinaryOp::Eq => {
                     out += &format!("%{} = eq {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Neq => {
+                BinaryOp::Neq => {
                     out += &format!("%{} = ne {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Less => {
+                BinaryOp::Less => {
                     out += &format!("%{} = lt {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::LessOrEqual => {
+                BinaryOp::LessOrEqual => {
                     out += &format!("%{} = le {}, {}\n", counter, lpos, rpos);
                     (out, counter)
                 }
-                ast::BinaryOp::Greater => {
+                BinaryOp::Greater => {
                     out += &format!("%{} = lt {}, {}\n", counter, rpos, lpos);
                     (out, counter)
                 }
-                ast::BinaryOp::GreaterOrEqual => {
+                BinaryOp::GreaterOrEqual => {
                     out += &format!("%{} = le {}, {}\n", counter, rpos, lpos);
                     (out, counter)
                 }
-                ast::BinaryOp::And => {
+                BinaryOp::And => {
                     out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
                     let mut counter = COUNTER.lock().unwrap();
                     let lpos = format!("%{}", counter);
@@ -334,7 +368,7 @@ fn expr2ir(exp: &ast::Expr, id_table: &IdTable) -> (String, i32) {
                     out += &format!("%{} = and {}, {}\n", counter, lpos, rpos);
                     (out, counter.clone())
                 }
-                ast::BinaryOp::Or => {
+                BinaryOp::Or => {
                     out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
                     let mut counter = COUNTER.lock().unwrap();
                     let lpos = format!("%{}", counter);
@@ -347,7 +381,7 @@ fn expr2ir(exp: &ast::Expr, id_table: &IdTable) -> (String, i32) {
                 } // _ => unreachable!(),
             }
         }
-        ast::Expr::LVal(lval) => {
+        Expr::LVal(lval) => {
             let element = id_table.get(lval);
             if element.0.is_none() {
                 panic!("Unable to Find Value")
