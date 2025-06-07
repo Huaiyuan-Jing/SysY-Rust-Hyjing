@@ -83,6 +83,8 @@ Stmt: Stmt = {
     <id: LVal> "=" <e: Expr> ";" => Stmt::Assign(id, e),
     <e: Opt<Expr>> ";" => Stmt::Expr(e),
     <block: Block> => Stmt::Block(Box::new(block)),
+    "if" "(" <e:Expr> ")" <s: Stmt> => Stmt::If(e, Box::new(s)),
+    "else" <s: Stmt> => Stmt::Else(Box::new(s)),
 };
 
 Number: i32 = <num: IntConst> => <>;
