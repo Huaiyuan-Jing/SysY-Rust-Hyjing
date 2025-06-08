@@ -125,16 +125,16 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 counter_guard.clone()
             };
             out += &format!("br {}, %then_{}, %else_{}\n", cond, id, id);
-            out += &format!("%then_{},\n", id);
+            out += &format!("%then_{}:\n", id);
             out += &stmt2ir(if_then, id_table);
-            out += &format!("%jump %end_{},\n", id);
-            out += &format!("%else_{},\n", id);
+            out += &format!("jump %end_{}\n", id);
+            out += &format!("%else_{}:\n", id);
             match else_then {
                 Some(else_then) => out += &stmt2ir(else_then, id_table),
                 None => {}
             }
-            out += &format!("%jump %end_{},\n", id);
-            out += &format!("%end_{}\n", id);
+            out += &format!("jump %end_{}\n", id);
+            out += &format!("%end_{}:\n", id);
         }
         _ => todo!(),
     }

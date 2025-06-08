@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();
@@ -16,7 +16,14 @@ pub fn ir2riscv(ir: String) -> String {
             size += 16 - size % 16;
         }
         out += &format!("addi sp, sp, -{}\n", size);
-        for (&_, node) in func_data.layout().bbs() {
+        for (&bb, node) in func_data.layout().bbs() {
+            println!("Block: {:?}", func_data.dfg().bb(bb).name());
+            if func_data.dfg().bb(bb).name().as_ref().unwrap() != "%entry" {
+                out += &format!(
+                    "{}:\n",
+                    &func_data.dfg().bb(bb).name().as_ref().unwrap()[1..]
+                );
+            }
             for &inst in node.insts().keys() {
                 let code = stmt2str(
                     func_data,
@@ -40,6 +47,10 @@ fn stmt2str(
     stack_offset: &mut i32,
     size: i32,
 ) -> String {
+    println!(
+        "Processing statement: {:?}",
+        func_data.dfg().value(*value).kind()
+    );
     let mut out = String::new();
     match func_data.dfg().value(*value).kind() {
         koopa::ir::ValueKind::Integer(int) => out = format!("li t{}, {}\n", reg_count, int.value()),
@@ -162,7 +173,11 @@ fn stmt2str(
                 *stack_offset += 4;
                 stack_map.insert(store.dest(), format!("{}(sp)", stack_offset));
             }
-            out += &format!("sw t{}, {}\n", reg_count, stack_map.get(&store.dest()).unwrap());
+            out += &format!(
+                "sw t{}, {}\n",
+                reg_count,
+                stack_map.get(&store.dest()).unwrap()
+            );
         }
         koopa::ir::ValueKind::Load(load) => {
             out += &format!(
@@ -174,9 +189,36 @@ fn stmt2str(
             stack_map.insert(*value, format!("{}(sp)", stack_offset));
             out += &format!("sw t{}, {}(sp)\n", reg_count, stack_offset);
         }
-        _ => unreachable!(),
+        koopa::ir::ValueKind::Branch(branch) => {
+            out += &format!(
+                "lw t{}, {}\n",
+                reg_count,
+                stack_map.get(&branch.cond()).unwrap()
+            );
+            out += &format!(
+                "bnez t{}, {}\n",
+                reg_count,
+                &func_data
+                    .dfg()
+                    .bb(branch.true_bb())
+                    .name()
+                    .as_ref()
+                    .unwrap()[1..]
+            );
+            out += &format!(
+                "j {}\n",
+                &func_data
+                    .dfg()
+                    .bb(branch.false_bb())
+                    .name()
+                    .as_ref()
+                    .unwrap()[1..]
+            );
+        }
+        koopa::ir::ValueKind::Jump(jump) => {
+            out += &format!("j {}\n", &func_data.dfg().bb(jump.target()).name().as_ref().unwrap()[1..]);
+        }
+        _ => {}
     }
-    println!("{:?}", func_data.dfg().value(*value).kind());
-    println!("out:\n{}", out);
     out
 }
