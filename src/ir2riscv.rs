@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 
 pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();
@@ -47,10 +47,10 @@ fn stmt2str(
     stack_offset: &mut i32,
     size: i32,
 ) -> String {
-    println!(
-        "Processing statement: {:?}",
-        func_data.dfg().value(*value).kind()
-    );
+    // println!(
+    //     "Processing statement: {:?}",
+    //     func_data.dfg().value(*value).kind()
+    // );
     let mut out = String::new();
     match func_data.dfg().value(*value).kind() {
         koopa::ir::ValueKind::Integer(int) => out = format!("li t{}, {}\n", reg_count, int.value()),
