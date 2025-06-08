@@ -190,11 +190,7 @@ fn stmt2str(
             out += &format!("sw t{}, {}(sp)\n", reg_count, stack_offset);
         }
         koopa::ir::ValueKind::Branch(branch) => {
-            out += &format!(
-                "lw t{}, {}\n",
-                reg_count,
-                stack_map.get(&branch.cond()).unwrap()
-            );
+            out += &stmt2str(func_data, &branch.cond(), reg_count, stack_map, stack_offset, size);
             out += &format!(
                 "bnez t{}, {}\n",
                 reg_count,

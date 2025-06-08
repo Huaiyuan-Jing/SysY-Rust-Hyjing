@@ -112,7 +112,7 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
             out += &block2ir(b, &mut table);
         }
         Stmt::IfElse(cond, if_then, else_then) => {
-            let tmp= expr2ir(cond, id_table);
+            let tmp = expr2ir(cond, id_table);
             out += &tmp.0;
             let cond = if tmp.0 == String::new() {
                 tmp.1.to_string()
@@ -124,16 +124,33 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 *counter_guard += 1;
                 counter_guard.clone()
             };
+            let then_is_ret = match &**if_then {
+                Stmt::Ret(_) => true,
+                Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
+                _ => false,
+            };
+            let else_is_ret = else_then
+                .as_ref()
+                .map(|else_s| match &**else_s {
+                    Stmt::Ret(_) => true,
+                    Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
+                    _ => false,
+                })
+                .unwrap_or(false);
             out += &format!("br {}, %then_{}, %else_{}\n", cond, id, id);
             out += &format!("%then_{}:\n", id);
             out += &stmt2ir(if_then, id_table);
-            out += &format!("jump %end_{}\n", id);
+            if !then_is_ret {
+                out += &format!("jump %end_{}\n", id);
+            }
             out += &format!("%else_{}:\n", id);
             match else_then {
                 Some(else_then) => out += &stmt2ir(else_then, id_table),
                 None => {}
             }
-            out += &format!("jump %end_{}\n", id);
+            if !else_is_ret {
+                out += &format!("jump %end_{}\n", id);
+            }
             out += &format!("%end_{}:\n", id);
         }
         _ => todo!(),
@@ -173,6 +190,12 @@ fn block2ir(block: &Block, id_table: &mut IdTable) -> String {
             }
             BlockItem::Stmt(s) => {
                 out += &stmt2ir(s, id_table);
+                match s {
+                    Stmt::Ret(_) => {
+                        break;
+                    }
+                    _ => {}
+                }
             }
             _ => unreachable!(),
         }
@@ -308,76 +331,131 @@ fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
             } else {
                 format!("%{}", rout.1)
             };
-            let mut out = format!("{}{}", lout.0, rout.0);
+            let generate_lhs = lout.0;
+            let generate_rhs = rout.0;
+            let mut out = String::new();
             let mut counter = COUNTER.lock().unwrap();
             *counter += 1;
-            let counter = counter.clone();
             match op {
                 BinaryOp::Plus => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = add {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Minus => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = sub {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Multiply => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = mul {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Divide => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = div {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Modulo => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = mod {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Eq => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = eq {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Neq => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = ne {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Less => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = lt {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::LessOrEqual => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = le {}, {}\n", counter, lpos, rpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::Greater => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = lt {}, {}\n", counter, rpos, lpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::GreaterOrEqual => {
+                    out += &generate_lhs;
+                    out += &generate_rhs;
                     out += &format!("%{} = le {}, {}\n", counter, rpos, lpos);
-                    (out, counter)
+                    (out, *counter)
                 }
                 BinaryOp::And => {
+                    out += &generate_lhs;
                     out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
-                    let mut counter = COUNTER.lock().unwrap();
-                    let lpos = format!("%{}", counter);
+                    let lpos = *counter;
+                    *counter += 1;
+                    let dest = *counter;
+                    out += &format!("@tmp{} = alloc i32\n", dest);
+                    out += &format!("store %{}, @tmp{}\n", lpos, dest);
+                    let if_id = {
+                        let mut counter = IF_COUNTER.lock().unwrap();
+                        *counter += 1;
+                        *counter
+                    };
+                    out += &format!("br %{}, %and_if{}, %and_end{}\n", lpos, if_id, if_id);
+                    out += &format!("%and_if{}:\n", if_id);
+                    out += &generate_rhs;
                     *counter += 1;
                     out += &format!("%{} = ne {}, {}\n", counter, 0, rpos);
-                    let rpos = format!("%{}", counter);
+                    let rpos = *counter;
+                    out += &format!("store %{}, @tmp{}\n", rpos, dest);
+                    out += &format!("jump %and_end{}\n", if_id);
+                    out += &format!("%and_end{}:\n", if_id);
                     *counter += 1;
-                    out += &format!("%{} = and {}, {}\n", counter, lpos, rpos);
-                    (out, counter.clone())
+                    out += &format!("%{} = load @tmp{}\n", *counter, dest);
+                    (out, *counter)
                 }
                 BinaryOp::Or => {
+                    out += &generate_lhs;
                     out += &format!("%{} = ne {}, {}\n", counter, 0, lpos);
-                    let mut counter = COUNTER.lock().unwrap();
-                    let lpos = format!("%{}", counter);
+                    let lpos = *counter;
+                    *counter += 1;
+                    let dest = *counter;
+                    out += &format!("@tmp{} = alloc i32\n", dest);
+                    out += &format!("store %{}, @tmp{}\n", lpos, dest);
+                    let if_id = {
+                        let mut counter = IF_COUNTER.lock().unwrap();
+                        *counter += 1;
+                        *counter
+                    };
+                    *counter += 1;
+                    out += &format!("%{} = eq {}, %{}\n", counter, 0, lpos);
+                    out += &format!("br %{}, %or_if{}, %or_end{}\n", counter, if_id, if_id);
+                    out += &format!("%or_if{}:\n", if_id);
+                    out += &generate_rhs;
                     *counter += 1;
                     out += &format!("%{} = ne {}, {}\n", counter, 0, rpos);
-                    let rpos = format!("%{}", counter);
+                    let rpos = *counter;
+                    out += &format!("store %{}, @tmp{}\n", rpos, dest);
+                    out += &format!("jump %or_end{}\n", if_id);
+                    out += &format!("%or_end{}:\n", if_id);
                     *counter += 1;
-                    out += &format!("%{} = or {}, {}\n", counter, lpos, rpos);
-                    (out, counter.clone())
+                    out += &format!("%{} = load @tmp{}\n", *counter, dest);
+                    (out, *counter)
                 } // _ => unreachable!(),
             }
         }
