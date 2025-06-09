@@ -91,11 +91,13 @@ MatchedStmt: Stmt = {
     <block: Block> => Stmt::Block(Box::new(block)),
     "if" "(" <condition: Expr> ")" <if_then: MatchedStmt> "else" <else_then: MatchedStmt> => Stmt::IfElse(condition, Box::new(if_then), Some(Box::new(else_then))),
     "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
+    "while" "(" <cond: Expr> ")" <body: MatchedStmt> => Stmt::While(cond, Box::new(body)),
 }
 
 OpenStmt: Stmt = {
     "if" "(" <condition: Expr> ")" <if_then: Stmt> => Stmt::IfElse(condition, Box::new(if_then), None),
     "if" "(" <condition: Expr> ")" <if_then: MatchedStmt> "else" <el: OpenStmt> => Stmt::IfElse(condition, Box::new(if_then), Some(Box::new(el))),
+    "while" "(" <cond: Expr> ")" <body: OpenStmt> => Stmt::While(cond, Box::new(body)),
 }
 
 Number: i32 = <num: IntConst> => <>;

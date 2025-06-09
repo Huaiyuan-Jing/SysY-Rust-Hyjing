@@ -1,19 +1,36 @@
 .text
 .globl main
 main:
-addi sp, sp, -32
-li t0, 1
-bnez t0, then_0
-j else_0
-then_0:
-li t0, 1
-mv a0, t0
-addi sp, sp, 32
-ret
-else_0:
-j end_0
-end_0:
+addi sp, sp, -64
 li t0, 0
-mv a0, t0
-addi sp, sp, 32
+sw t0, 0(sp)
+j while_entry0
+while_entry0:
+lw t0, 0(sp)
+sw t0, 4(sp)
+lw t0, 4(sp)
+li t1, 10
+slt t0, t0, t1
+sw t0, 8(sp)
+lw t0, 4(sp)
+li t1, 10
+slt t0, t0, t1
+sw t0, 12(sp)
+bnez t0, while_body0
+j while_end0
+while_body0:
+lw t0, 0(sp)
+sw t0, 16(sp)
+lw t0, 16(sp)
+li t1, 1
+add t0, t0, t1
+sw t0, 20(sp)
+lw t0, 20(sp)
+sw t0, 0(sp)
+j while_entry0
+while_end0:
+lw t0, 0(sp)
+sw t0, 24(sp)
+lw a0, 24(sp)
+addi sp, sp, 64
 ret

@@ -5,6 +5,7 @@ lazy_static! {
     static ref COUNTER: Mutex<i32> = Mutex::new(-1);
     static ref BLOCK_COUNTER: Mutex<i32> = Mutex::new(-1);
     static ref IF_COUNTER: Mutex<i32> = Mutex::new(-1);
+    static ref WHILE_COUNTER: Mutex<i32> = Mutex::new(-1);
 }
 enum IdElement {
     Const(i32),
@@ -152,6 +153,30 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 out += &format!("jump %end_{}\n", id);
             }
             out += &format!("%end_{}:\n", id);
+        }
+        Stmt::While(cond, body) => {
+            let while_id = {
+                let mut lock = WHILE_COUNTER.lock().unwrap();
+                *lock += 1;
+                *lock
+            };
+            out += &format!("jump %while_entry{}\n", while_id);
+            out += &format!("%while_entry{}:\n", while_id);
+            let tmp = expr2ir(cond, id_table);
+            out += &tmp.0;
+            let pos = if tmp.0 == "" {tmp.1.to_string()} else {format!("%{}", tmp.1)};
+            out += &format!("br {}, %while_body{}, %while_end{}\n", pos, while_id, while_id);
+            out += &format!("%while_body{}:\n", while_id);
+            out += &stmt2ir(body, id_table);
+            let body_is_ret = match body.as_ref() {
+                Stmt::Ret(_) => true,
+                Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
+                _ => false,
+            };
+            if !body_is_ret {
+                out += &format!("jump %while_entry{}\n", while_id);
+            }
+            out += &format!("%while_end{}:\n", while_id);
         }
         _ => todo!(),
     }
