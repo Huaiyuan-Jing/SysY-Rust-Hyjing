@@ -92,6 +92,8 @@ MatchedStmt: Stmt = {
     "if" "(" <condition: Expr> ")" <if_then: MatchedStmt> "else" <else_then: MatchedStmt> => Stmt::IfElse(condition, Box::new(if_then), Some(Box::new(else_then))),
     "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
     "while" "(" <cond: Expr> ")" <body: MatchedStmt> => Stmt::While(cond, Box::new(body)),
+    "break" ";" => Stmt::Break,
+    "continue" ";" => Stmt::Continue,
 }
 
 OpenStmt: Stmt = {

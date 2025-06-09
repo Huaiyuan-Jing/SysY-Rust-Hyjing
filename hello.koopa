@@ -6,13 +6,11 @@ jump %while_entry0
 %while_entry0:
 %0 = load @i_0
 %1 = lt %0, 10
-br %1 %while_body0, %while_end0
-%while_body0
-%2 = load @i_0
-%3 = add %2, 1
-store %3, @i_0
+br %1, %while_body0, %while_end0
+%while_body0:
+store 20, @i_0
 jump %while_entry0
-%while_end0
-%4 = load @i_0
-ret %4
+%while_end0:
+%2 = load @i_0
+ret %2
 }

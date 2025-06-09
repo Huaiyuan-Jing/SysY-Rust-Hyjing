@@ -19,17 +19,17 @@ fn main() -> Result<()> {
 
     let input = read_to_string(input)?;
 
-    let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
+    let mut ast = sysy::CompUnitParser::new().parse(&input).unwrap();
     println!("{:#?}", ast);
     let mut koopa_ir;
     if mode == "-koopa" {
-        koopa_ir = ast2ir::ast2ir(&ast);
+        koopa_ir = ast2ir::ast2ir(&mut ast);
         fs::write(outfile, koopa_ir)?;
         return Ok(());
     }
     let mut riscv;
     if mode == "-riscv" {
-        koopa_ir = ast2ir::ast2ir(&ast);
+        koopa_ir = ast2ir::ast2ir(&mut ast);
         riscv = ir2riscv::ir2riscv(koopa_ir);
         fs::write(outfile, riscv)?;
         return Ok(());

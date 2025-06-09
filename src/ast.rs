@@ -35,6 +35,8 @@ pub enum Stmt {
     Expr(Option<Expr>),
     IfElse(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]

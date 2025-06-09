@@ -42,7 +42,7 @@ impl<'a> IdTable<'a> {
         }
     }
 }
-pub fn ast2ir(ast: &CompUnit) -> String {
+pub fn ast2ir(ast: &mut CompUnit) -> String {
     let func_type = match ast.func_def.func_type {
         FuncType::Int => "i32",
     };
@@ -56,12 +56,14 @@ pub fn ast2ir(ast: &CompUnit) -> String {
         counter_guard.clone()
     };
     let mut table = IdTable::new(None, id);
-    out += &block2ir(&ast.func_def.block, &mut table);
+    let (st, _) = &block2ir(&mut ast.func_def.block, &mut table, -1);
+    out += st;
     out += "}\n";
     out
 }
-fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
+fn stmt2ir(stmt: &mut Stmt, id_table: &mut IdTable, cur_while_id: i32) -> (String, bool) {
     let mut out = String::new();
+    let mut is_exit = false;
     match stmt {
         Stmt::Ret(e) => match e {
             Some(e) => {
@@ -73,9 +75,11 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 };
                 out += &tmp.0;
                 out += &format!("ret {}\n", pos);
+                is_exit = true;
             }
             None => {
                 out += "ret\n";
+                is_exit = true;
             }
         },
         Stmt::Assign(id, e) => {
@@ -110,7 +114,11 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 counter_guard.clone()
             };
             let mut table = IdTable::new(Some(id_table), id);
-            out += &block2ir(b, &mut table);
+            let (st, is_exit_block) = &block2ir(b, &mut table, cur_while_id);
+            out += st;
+            if *is_exit_block {
+                is_exit = true;
+            }
         }
         Stmt::IfElse(cond, if_then, else_then) => {
             let tmp = expr2ir(cond, id_table);
@@ -125,34 +133,34 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
                 *counter_guard += 1;
                 counter_guard.clone()
             };
-            let then_is_ret = match &**if_then {
-                Stmt::Ret(_) => true,
-                Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
-                _ => false,
-            };
-            let else_is_ret = else_then
-                .as_ref()
-                .map(|else_s| match &**else_s {
-                    Stmt::Ret(_) => true,
-                    Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
-                    _ => false,
-                })
-                .unwrap_or(false);
-            out += &format!("br {}, %then_{}, %else_{}\n", cond, id, id);
-            out += &format!("%then_{}:\n", id);
-            out += &stmt2ir(if_then, id_table);
-            if !then_is_ret {
-                out += &format!("jump %end_{}\n", id);
-            }
-            out += &format!("%else_{}:\n", id);
             match else_then {
-                Some(else_then) => out += &stmt2ir(else_then, id_table),
-                None => {}
+                None => {
+                    out += &format!("br {}, %then_{}, %end_{}\n", cond, id, id);
+                    out += &format!("%then_{}:\n", id);
+                    let (st, then_is_ret) = &stmt2ir(if_then, id_table, cur_while_id);
+                    out += st;
+                    if !then_is_ret {
+                        out += &format!("jump %end_{}\n", id);
+                    }
+                    out += &format!("%end_{}:\n", id);
+                }
+                Some(else_then) => {
+                    out += &format!("br {}, %then_{}, %else_{}\n", cond, id, id);
+                    out += &format!("%then_{}:\n", id);
+                    let (st, then_is_ret) = &stmt2ir(if_then, id_table, cur_while_id);
+                    out += st;
+                    if !then_is_ret {
+                        out += &format!("jump %end_{}\n", id);
+                    }
+                    out += &format!("%else_{}:\n", id);
+                    let (st, else_is_ret) = &stmt2ir(else_then.as_mut(), id_table, cur_while_id);
+                    out += st;
+                    if !else_is_ret {
+                        out += &format!("jump %end_{}\n", id);
+                    }
+                    out += &format!("%end_{}:\n", id);
+                }
             }
-            if !else_is_ret {
-                out += &format!("jump %end_{}\n", id);
-            }
-            out += &format!("%end_{}:\n", id);
         }
         Stmt::While(cond, body) => {
             let while_id = {
@@ -164,29 +172,46 @@ fn stmt2ir(stmt: &Stmt, id_table: &mut IdTable) -> String {
             out += &format!("%while_entry{}:\n", while_id);
             let tmp = expr2ir(cond, id_table);
             out += &tmp.0;
-            let pos = if tmp.0 == "" {tmp.1.to_string()} else {format!("%{}", tmp.1)};
-            out += &format!("br {}, %while_body{}, %while_end{}\n", pos, while_id, while_id);
-            out += &format!("%while_body{}:\n", while_id);
-            out += &stmt2ir(body, id_table);
-            let body_is_ret = match body.as_ref() {
-                Stmt::Ret(_) => true,
-                Stmt::Block(b) => matches!(b.items.last(), Some(BlockItem::Stmt(Stmt::Ret(_)))),
-                _ => false,
+            let pos = if tmp.0 == "" {
+                tmp.1.to_string()
+            } else {
+                format!("%{}", tmp.1)
             };
+            out += &format!(
+                "br {}, %while_body{}, %while_end{}\n",
+                pos, while_id, while_id
+            );
+            out += &format!("%while_body{}:\n", while_id);
+            let (st, body_is_ret) = &stmt2ir(body, id_table, while_id);
+            out += st;
             if !body_is_ret {
                 out += &format!("jump %while_entry{}\n", while_id);
             }
             out += &format!("%while_end{}:\n", while_id);
         }
+        Stmt::Break => {
+            if cur_while_id == -1 {
+                panic!("Break outside of while loop");
+            }
+            out += &format!("jump %while_end{}\n", cur_while_id);
+            is_exit = true;
+        }
+        Stmt::Continue => {
+            if cur_while_id == -1 {
+                panic!("Continue outside of while loop");
+            }
+            out += &format!("jump %while_entry{}\n", cur_while_id);
+            is_exit = true;
+        }
         _ => todo!(),
     }
-    out
+    (out, is_exit)
 }
-fn block2ir(block: &Block, id_table: &mut IdTable) -> String {
+fn block2ir(block: &mut Block, id_table: &mut IdTable, cur_while_id: i32) -> (String, bool) {
     // println!("Block: {}\n", id_table.offset);
     let mut out = String::new();
     // let mut if_else_stack = Vec::new();
-    for item in &block.items {
+    for item in &mut block.items {
         // println!("{:#?}", item);
         match item {
             BlockItem::ConstDecl(clist) => {
@@ -214,18 +239,16 @@ fn block2ir(block: &Block, id_table: &mut IdTable) -> String {
                 }
             }
             BlockItem::Stmt(s) => {
-                out += &stmt2ir(s, id_table);
-                match s {
-                    Stmt::Ret(_) => {
-                        break;
-                    }
-                    _ => {}
+                let (st, is_exit_st) = &stmt2ir(s, id_table, cur_while_id);
+                out += st;
+                if *is_exit_st {
+                    return (out, true);
                 }
             }
             _ => unreachable!(),
         }
     }
-    out
+    (out, false)
 }
 fn compute_expr(expr: &Expr, id_table: &IdTable) -> i32 {
     match expr {
