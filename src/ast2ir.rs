@@ -10,6 +10,7 @@ lazy_static! {
 enum IdElement {
     Const(i32),
     Var(String),
+    Func(String),
 }
 struct IdTable<'a> {
     table: HashMap<String, IdElement>,
@@ -44,19 +45,45 @@ impl<'a> IdTable<'a> {
 }
 pub fn ast2ir(ast: &mut CompUnit) -> String {
     let mut out = String::new();
+    let block_id = {
+        let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
+        *counter_guard += 1;
+        counter_guard.clone()
+    };
+    let mut global_id_table = IdTable::new(None, block_id); // Global scope
     for func_def in ast.func_defs.iter_mut() {
         let func_type = match func_def.func_type {
             FuncType::Int => ": i32",
             FuncType::Void => "",
         };
-        out += &format!("fun @{}(){} {{\n%entry:\n", &func_def.ident, func_type);
+        global_id_table.insert(
+            func_def.ident.clone(),
+            IdElement::Func(match func_def.func_type {
+                FuncType::Int => "i32".to_string(),
+                FuncType::Void => "void".to_string(),
+            }),
+        );
+        out += &format!("fun @{}(", &func_def.ident);
+        for param in func_def.params.iter() {
+            out += &format!("@{}: {},", param.ident, param.kind);
+        }
+        out += &format!("){} {{\n", func_type);
+        out += &format!("%entry:\n");
         let id = {
             let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
             *counter_guard += 1;
             counter_guard.clone()
         };
-        let mut table = IdTable::new(None, id);
-        let (st, _) = &block2ir(&mut func_def.block, &mut table, -1);
+        let mut table = IdTable::new(Some(&global_id_table), id);
+        for param in func_def.params.iter() {
+            table.insert(param.ident.clone(), IdElement::Var(param.kind.clone()));
+            out += &format!("@{} = alloc i32\n", table.get(&param.ident).1);
+            out += &format!("store @{}, @{}\n", param.ident, table.get(&param.ident).1);
+        }
+        let (st, has_ret) = &block2ir(&mut func_def.block, &mut table, -1);
+        if !*has_ret {
+            out += &format!("ret\n");
+        }
         out += st;
         out += "}\n";
     }
@@ -341,11 +368,11 @@ fn compute_expr(expr: &Expr, id_table: &IdTable) -> i32 {
                 panic!("Unable to Find Value")
             }
             match out.0.unwrap() {
-                IdElement::Var(_) => panic!("Unable to calculate"),
                 IdElement::Const(c) => *c,
+                _ => panic!("Unable to calculate"),
             }
         }
-        _ => todo!()
+        _ => unreachable!(),
     }
 }
 fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
@@ -522,8 +549,49 @@ fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
                     let out = format!("%{} = load @{}\n", *counter, element.1);
                     (out, *counter)
                 }
+                _ => todo!(),
             }
-        } 
+        }
+        Expr::Func(ident, args) => match id_table.get(ident).0.unwrap() {
+            IdElement::Func(kind) => {
+                let mut out = String::new();
+                let mut out_reg_id = -1;
+                if kind == "void" {
+                    let mut tmp = format!("call @{}(", ident);
+                    for arg in args.iter() {
+                        let (st, pos) = expr2ir(arg, id_table);
+                        out += &st;
+                        if st == String::new() {
+                            tmp += &format!("{}, ", pos);
+                        } else {
+                            tmp += &format!("%{},", pos);
+                        }
+                    }
+                    tmp += ")\n";
+                    out += &tmp;
+                } else {
+                    out_reg_id = {
+                        let mut counter = COUNTER.lock().unwrap();
+                        *counter += 1;
+                        *counter
+                    };
+                    let mut tmp = format!("%{} = call @{}(", out_reg_id, ident);
+                    for arg in args.iter() {
+                        let (st, pos) = expr2ir(arg, id_table);
+                        out += &st;
+                        if st == String::new() {
+                            tmp += &format!("{}, ", pos);
+                        } else {
+                            tmp += &format!("%{},", pos);
+                        }
+                    }
+                    tmp += ")\n";
+                    out += &tmp;
+                }
+                (out, out_reg_id)
+            }
+            _ => panic!("Not a Function"),
+        },
         _ => todo!(),
     }
 }

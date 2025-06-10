@@ -1,16 +1,18 @@
+fun @half(@x: int,): i32 {
+%entry:
+@x_1 = alloc i32
+store @x, @x_1
+%0 = load @x_1
+%1 = div %0, 2
+ret %1
+}
+fun @f() {
+%entry:
+ret
+}
 fun @main(): i32 {
 %entry:
-@i_0 = alloc i32
-store 0, @i_0
-jump %while_entry0
-%while_entry0:
-%0 = load @i_0
-%1 = lt %0, 10
-br %1, %while_body0, %while_end0
-%while_body0:
-store 20, @i_0
-jump %while_entry0
-%while_end0:
-%2 = load @i_0
+call @f()
+%2 = call @half(10, )
 ret %2
 }
