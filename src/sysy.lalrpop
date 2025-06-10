@@ -10,15 +10,20 @@ match {
     _
 }
 
-pub CompUnit: CompUnit = <func_def: FuncDef> => CompUnit{ <> };
+pub CompUnit: CompUnit = <func_defs: Repeat<FuncDef>> => CompUnit{ <> };
 
 FuncDef: FuncDef = {
-    <func_type: FuncType> <ident: Ident> "(" ")" <block: Block> => {
+    <func_type: FuncType> <ident: Ident> "(" <params: Comma<FuncFParam>> ")" <block: Block> => {
         FuncDef { <> }
     }
 }
 
-FuncType: FuncType = "int" => FuncType::Int;
+FuncType: FuncType = {
+    "int" => FuncType::Int,
+    "void" => FuncType::Void,
+}
+
+FuncFParam: FuncParam = <kind: BType> <ident: Ident> => FuncParam{ <> };
 
 Block: Block = "{" <items: Repeat<BlockItem>> "}" => {
     Block { items: items }
@@ -117,6 +122,7 @@ Expr: Expr = <exp: LOrExp> => <>;
 UnaryExp: Expr = {
     <e: PrimaryExp> => e,
     <op: UnaryOp> <expr: UnaryExp> => Expr::UnaryExpr(op, Box::new(expr)),
+    <ident: Ident> "(" <args: Comma<Expr>> ")" => Expr::Func(ident, args),
 };
 
 PrimaryExp: Expr = {

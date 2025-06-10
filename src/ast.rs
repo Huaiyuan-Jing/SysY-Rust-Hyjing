@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub struct CompUnit {
-    pub func_def: FuncDef,
+    pub func_defs: Vec<FuncDef>,
 }
 
 #[derive(Debug)]
@@ -8,11 +8,19 @@ pub struct FuncDef {
     pub func_type: FuncType,
     pub ident: String,
     pub block: Block,
+    pub params: Vec<FuncParam>,
+}
+
+#[derive(Debug)]
+pub struct FuncParam {
+    pub ident: String,
+    pub kind: String,
 }
 
 #[derive(Debug)]
 pub enum FuncType {
     Int,
+    Void,
 }
 
 #[derive(Debug)]
@@ -45,6 +53,7 @@ pub enum Expr {
     UnaryExpr(UnaryOp, Box<Expr>),
     BinaryExpr(Box<Expr>, BinaryOp, Box<Expr>),
     LVal(String),
+    Func(String, Vec<Expr>),
 }
 
 #[derive(Debug)]

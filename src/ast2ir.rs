@@ -43,22 +43,23 @@ impl<'a> IdTable<'a> {
     }
 }
 pub fn ast2ir(ast: &mut CompUnit) -> String {
-    let func_type = match ast.func_def.func_type {
-        FuncType::Int => "i32",
-    };
-    let mut out = format!(
-        "fun @{}(): {} {{\n%entry:\n",
-        &ast.func_def.ident, func_type
-    );
-    let id = {
-        let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
-        *counter_guard += 1;
-        counter_guard.clone()
-    };
-    let mut table = IdTable::new(None, id);
-    let (st, _) = &block2ir(&mut ast.func_def.block, &mut table, -1);
-    out += st;
-    out += "}\n";
+    let mut out = String::new();
+    for func_def in ast.func_defs.iter_mut() {
+        let func_type = match func_def.func_type {
+            FuncType::Int => ": i32",
+            FuncType::Void => "",
+        };
+        out += &format!("fun @{}(){} {{\n%entry:\n", &func_def.ident, func_type);
+        let id = {
+            let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
+            *counter_guard += 1;
+            counter_guard.clone()
+        };
+        let mut table = IdTable::new(None, id);
+        let (st, _) = &block2ir(&mut func_def.block, &mut table, -1);
+        out += st;
+        out += "}\n";
+    }
     out
 }
 fn stmt2ir(stmt: &mut Stmt, id_table: &mut IdTable, cur_while_id: i32) -> (String, bool) {
@@ -344,6 +345,7 @@ fn compute_expr(expr: &Expr, id_table: &IdTable) -> i32 {
                 IdElement::Const(c) => *c,
             }
         }
+        _ => todo!()
     }
 }
 fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
@@ -521,6 +523,7 @@ fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
                     (out, *counter)
                 }
             }
-        } // _ => unreachable!(),
+        } 
+        _ => todo!(),
     }
 }
