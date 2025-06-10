@@ -61,7 +61,7 @@ ConstDecl: Vec<ConstDef> = "const" <tp: BType> <mut l: Comma<ConstDef>> ";" => {
     l
 };
 
-BType: String = "int" => "int".to_string();
+BType: String = "int" => "i32".to_string();
 
 ConstDef: ConstDef = <id: Ident> "=" <val: ConstInitVal> => ConstDef { kind: String::new(), id: id, value: val };
 

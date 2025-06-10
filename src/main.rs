@@ -21,13 +21,15 @@ fn main() -> Result<()> {
 
     let mut ast = sysy::CompUnitParser::new().parse(&input).unwrap();
     println!("{:#?}", ast);
-    let mut koopa_ir;
+    let koopa_ir;
     if mode == "-koopa" {
         koopa_ir = ast2ir::ast2ir(&mut ast);
+        let driver = koopa::front::Driver::from(koopa_ir.clone());
+        let program = driver.generate_program().unwrap();
         fs::write(outfile, koopa_ir)?;
         return Ok(());
     }
-    let mut riscv;
+    let riscv;
     if mode == "-riscv" {
         koopa_ir = ast2ir::ast2ir(&mut ast);
         riscv = ir2riscv::ir2riscv(koopa_ir);

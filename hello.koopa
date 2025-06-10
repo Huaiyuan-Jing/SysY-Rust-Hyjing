@@ -1,4 +1,4 @@
-fun @half(@x: int,): i32 {
+fun @half(@x: i32): i32 {
 %entry:
 @x_1 = alloc i32
 store @x, @x_1
@@ -13,6 +13,6 @@ ret
 fun @main(): i32 {
 %entry:
 call @f()
-%2 = call @half(10, )
+%2 = call @half(10)
 ret %2
 }

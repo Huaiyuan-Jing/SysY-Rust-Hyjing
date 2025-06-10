@@ -64,8 +64,12 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
             }),
         );
         out += &format!("fun @{}(", &func_def.ident);
-        for param in func_def.params.iter() {
-            out += &format!("@{}: {},", param.ident, param.kind);
+        for i in 0..func_def.params.len() {
+            let param = &func_def.params[i];
+            out += &format!("@{}: {}", param.ident, param.kind);
+            if i < func_def.params.len() - 1 {
+                out += ", ";
+            }
         }
         out += &format!("){} {{\n", func_type);
         out += &format!("%entry:\n");
@@ -558,13 +562,17 @@ fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
                 let mut out_reg_id = -1;
                 if kind == "void" {
                     let mut tmp = format!("call @{}(", ident);
-                    for arg in args.iter() {
+                    for i in 0..args.len() {
+                        let arg = &args[i];
                         let (st, pos) = expr2ir(arg, id_table);
                         out += &st;
                         if st == String::new() {
-                            tmp += &format!("{}, ", pos);
+                            tmp += &format!("{}", pos);
                         } else {
-                            tmp += &format!("%{},", pos);
+                            tmp += &format!("%{}", pos);
+                        }
+                        if i < args.len() - 1 {
+                            tmp += ", ";
                         }
                     }
                     tmp += ")\n";
@@ -576,13 +584,17 @@ fn expr2ir(exp: &Expr, id_table: &IdTable) -> (String, i32) {
                         *counter
                     };
                     let mut tmp = format!("%{} = call @{}(", out_reg_id, ident);
-                    for arg in args.iter() {
+                    for i in 0..args.len() {
+                        let arg = &args[i];
                         let (st, pos) = expr2ir(arg, id_table);
                         out += &st;
                         if st == String::new() {
-                            tmp += &format!("{}, ", pos);
+                            tmp += &format!("{}", pos);
                         } else {
-                            tmp += &format!("%{},", pos);
+                            tmp += &format!("%{}", pos);
+                        }
+                        if i < args.len() - 1 {
+                            tmp += ", ";
                         }
                     }
                     tmp += ")\n";
