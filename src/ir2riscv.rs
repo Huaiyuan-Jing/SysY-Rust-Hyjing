@@ -83,7 +83,7 @@ fn stmt2str(
             if ret.value().is_none() {
                 out += &format!("lw ra {}(sp)\n", size - 4);
                 out += &format!("addi sp, sp, {}\n", size);
-                out += &format!("ret\n");
+                out += "ret\n";
             } else {
                 if stack_map.contains_key(&ret.value().unwrap()) {
                     out += &format!("lw a0, {}\n", stack_map.get(&ret.value().unwrap()).unwrap());
@@ -101,7 +101,7 @@ fn stmt2str(
                 }
                 out += &format!("lw ra {}(sp)\n", size - 4);
                 out += &format!("addi sp, sp, {}\n", size);
-                out += &format!("ret\n");
+                out += "ret\n";
             }
         }
         koopa::ir::ValueKind::Binary(bin) => {
