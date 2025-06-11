@@ -1,11 +1,14 @@
-int half(int x) {
+int half(int x)
+{
   return x / 2;
 }
 
-int f() {
+int f()
+{
   return 1;
 }
 
-int main() {
+int main()
+{
   return half(10) + f();
 }
