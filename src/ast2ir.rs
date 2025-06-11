@@ -72,11 +72,11 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
             }
         }
         out += &format!("){} {{\n", func_type);
-        out += &format!("%entry:\n");
+        out += "%entry:\n";
         let id = {
             let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
             *counter_guard += 1;
-            counter_guard.clone()
+            *counter_guard
         };
         let mut table = IdTable::new(Some(&global_id_table), id);
         for param in func_def.params.iter() {
@@ -86,7 +86,7 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
         }
         let (st, has_ret) = &block2ir(&mut func_def.block, &mut table, -1);
         if !*has_ret {
-            out += &format!("ret\n");
+            out += "ret\n";
         }
         out += st;
         out += "}\n";
