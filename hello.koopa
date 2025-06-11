@@ -6,13 +6,14 @@ store @x, @x_1
 %1 = div %0, 2
 ret %1
 }
-fun @f() {
+fun @f(): i32 {
 %entry:
-ret
+ret 1
 }
 fun @main(): i32 {
 %entry:
-call @f()
 %2 = call @half(10)
-ret %2
+%3 = call @f()
+%4 = add %2, %3
+ret %4
 }

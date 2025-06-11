@@ -2,9 +2,10 @@ int half(int x) {
   return x / 2;
 }
 
-void f() {}
+int f() {
+  return 1;
+}
 
 int main() {
-  f();
-  return half(10);
+  return half(10) + f();
 }
