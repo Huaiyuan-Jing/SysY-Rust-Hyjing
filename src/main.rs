@@ -20,12 +20,12 @@ fn main() -> Result<()> {
     let input = read_to_string(input)?;
 
     let mut ast = sysy::CompUnitParser::new().parse(&input).unwrap();
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
     let koopa_ir;
     if mode == "-koopa" {
         koopa_ir = ast2ir::ast2ir(&mut ast);
         let driver = koopa::front::Driver::from(koopa_ir.clone());
-        let program = driver.generate_program().unwrap();
+        driver.generate_program().unwrap();
         fs::write(outfile, koopa_ir)?;
         return Ok(());
     }
