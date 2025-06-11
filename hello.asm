@@ -20,6 +20,8 @@ ret
 f:
 addi sp, sp, -16
 sw ra 12(sp)
+li t0, 1
+mv a0, t0
 lw ra 12(sp)
 addi sp, sp, 16
 ret
@@ -28,15 +30,19 @@ ret
 main:
 addi sp, sp, -32
 sw ra 28(sp)
-call f
-sw a0, 4(sp)
-lw t0, 4(sp)
 li t0, 10
 sw t0, 0(sp)
 call half
+sw a0, 4(sp)
+lw t0, 4(sp)
+call f
 sw a0, 8(sp)
 lw t0, 8(sp)
-lw a0, 8(sp)
+lw t0, 4(sp)
+lw t1, 8(sp)
+add t0, t0, t1
+sw t0, 12(sp)
+lw a0, 12(sp)
 lw ra 28(sp)
 addi sp, sp, 32
 ret
