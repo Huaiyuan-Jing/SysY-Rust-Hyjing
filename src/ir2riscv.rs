@@ -4,20 +4,42 @@ pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();
     let driver = koopa::front::Driver::from(ir);
     let program = driver.generate_program().unwrap();
-    out += ".text\n";
     for &func in program.func_layout() {
+        out += ".text\n";
         let func_data = program.func(func);
         out += &format!(".globl {}\n", &func_data.name()[1..]);
         out += &format!("{}:\n", &func_data.name()[1..]);
         let mut stack_map: HashMap<koopa::ir::Value, String> = HashMap::new();
         let mut stack_offset = -4;
-        let mut size = func_data.dfg().values().len() * 4;
+        let mut size = func_data.dfg().values().len() * 4 + 4;
+        let mut max_arg_num = 0;
+        for (_, node) in func_data.layout().bbs() {
+            for &inst in node.insts().keys() {
+                match func_data.dfg().value(inst).kind() {
+                    koopa::ir::ValueKind::Call(call_inst) => {
+                        max_arg_num =
+                            max_arg_num.max(program.func(call_inst.callee()).params().len());
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
+        }
+        size += max_arg_num * 4;
+        stack_offset += max_arg_num as i32 * 4;
         if size % 16 != 0 {
             size += 16 - size % 16;
         }
         out += &format!("addi sp, sp, -{}\n", size);
+        out += &format!("sw ra {}(sp)\n", size - 4);
+        let mut arg_pos = size;
+        for arg in func_data.params() {
+            stack_map.insert(*arg, format!("{}(sp)", arg_pos));
+            arg_pos += 4;
+        }
         for (&bb, node) in func_data.layout().bbs() {
-            println!("Block: {:?}", func_data.dfg().bb(bb).name());
+            // println!("Block: {:?}", func_data.dfg().bb(bb).name());
             if func_data.dfg().bb(bb).name().as_ref().unwrap() != "%entry" {
                 out += &format!(
                     "{}:\n",
@@ -26,6 +48,7 @@ pub fn ir2riscv(ir: String) -> String {
             }
             for &inst in node.insts().keys() {
                 let code = stmt2str(
+                    &program,
                     func_data,
                     &inst,
                     0,
@@ -40,6 +63,7 @@ pub fn ir2riscv(ir: String) -> String {
     out
 }
 fn stmt2str(
+    program: &koopa::ir::Program,
     func_data: &koopa::ir::FunctionData,
     value: &koopa::ir::Value,
     reg_count: usize,
@@ -47,15 +71,16 @@ fn stmt2str(
     stack_offset: &mut i32,
     size: i32,
 ) -> String {
-    // println!(
-    //     "Processing statement: {:?}",
-    //     func_data.dfg().value(*value).kind()
-    // );
+    println!(
+        "Processing statement: {:?}",
+        func_data.dfg().value(*value).kind()
+    );
     let mut out = String::new();
     match func_data.dfg().value(*value).kind() {
         koopa::ir::ValueKind::Integer(int) => out = format!("li t{}, {}\n", reg_count, int.value()),
         koopa::ir::ValueKind::Return(ret) => {
             if ret.value().is_none() {
+                out += &format!("lw ra {}(sp)\n", size - 4);
                 out += &format!("addi sp, sp, {}\n", size);
                 out += &format!("ret\n");
             } else {
@@ -63,6 +88,7 @@ fn stmt2str(
                     out += &format!("lw a0, {}\n", stack_map.get(&ret.value().unwrap()).unwrap());
                 } else {
                     out += &stmt2str(
+                        program,
                         func_data,
                         &ret.value().unwrap(),
                         reg_count,
@@ -72,6 +98,7 @@ fn stmt2str(
                     );
                     out += &format!("mv a0, t{}\n", reg_count);
                 }
+                out += &format!("lw ra {}(sp)\n", size - 4);
                 out += &format!("addi sp, sp, {}\n", size);
                 out += &format!("ret\n");
             }
@@ -84,6 +111,7 @@ fn stmt2str(
                 out += &format!("lw {}, {}\n", lhs_reg, stack_map.get(&bin.lhs()).unwrap());
             } else {
                 out += &stmt2str(
+                    program,
                     func_data,
                     &bin.lhs(),
                     reg_count,
@@ -96,6 +124,7 @@ fn stmt2str(
                 out += &format!("lw {}, {}\n", rhs_reg, stack_map.get(&bin.rhs()).unwrap());
             } else {
                 out += &stmt2str(
+                    program,
                     func_data,
                     &bin.rhs(),
                     reg_count + 1,
@@ -161,6 +190,7 @@ fn stmt2str(
                 );
             } else {
                 out += &stmt2str(
+                    program,
                     func_data,
                     &store.value(),
                     reg_count,
@@ -190,7 +220,15 @@ fn stmt2str(
             out += &format!("sw t{}, {}(sp)\n", reg_count, stack_offset);
         }
         koopa::ir::ValueKind::Branch(branch) => {
-            out += &stmt2str(func_data, &branch.cond(), reg_count, stack_map, stack_offset, size);
+            out += &stmt2str(
+                program,
+                func_data,
+                &branch.cond(),
+                reg_count,
+                stack_map,
+                stack_offset,
+                size,
+            );
             out += &format!(
                 "bnez t{}, {}\n",
                 reg_count,
@@ -212,7 +250,35 @@ fn stmt2str(
             );
         }
         koopa::ir::ValueKind::Jump(jump) => {
-            out += &format!("j {}\n", &func_data.dfg().bb(jump.target()).name().as_ref().unwrap()[1..]);
+            out += &format!(
+                "j {}\n",
+                &func_data.dfg().bb(jump.target()).name().as_ref().unwrap()[1..]
+            );
+        }
+        koopa::ir::ValueKind::Call(call) => {
+            let mut arg_pos = 0;
+            for arg in call.args() {
+                if stack_map.contains_key(arg) {
+                    out += &format!("lw t{}, {}\n", reg_count, stack_map.get(arg).unwrap());
+                } else {
+                    out += &stmt2str(
+                        program,
+                        func_data,
+                        arg,
+                        reg_count,
+                        stack_map,
+                        stack_offset,
+                        size,
+                    );
+                }
+                out += &format!("sw t{}, {}(sp)\n", reg_count, arg_pos * 4);
+                arg_pos += 1;
+            }
+            out += &format!("call {}\n", &program.func(call.callee()).name()[1..]);
+            *stack_offset += 4;
+            stack_map.insert(*value, format!("{}(sp)", *stack_offset));
+            out += &format!("sw a0, {}\n", stack_map.get(value).unwrap());
+            out += &format!("lw t{}, {}\n", reg_count, stack_map.get(value).unwrap());
         }
         _ => {}
     }
