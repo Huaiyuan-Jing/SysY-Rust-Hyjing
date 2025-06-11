@@ -1,9 +1,9 @@
-fun @half(@x: i32): i32 {
+fun @times2(@x: i32): i32 {
 %entry:
 @x_1 = alloc i32
 store @x, @x_1
 %0 = load @x_1
-%1 = div %0, 2
+%1 = mul %0, 2
 ret %1
 }
 fun @f(): i32 {
@@ -12,8 +12,9 @@ ret 1
 }
 fun @main(): i32 {
 %entry:
-%2 = call @half(10)
 %3 = call @f()
-%4 = add %2, %3
-ret %4
+%2 = call @times2(%3)
+%4 = call @f()
+%5 = add %2, %4
+ret %5
 }

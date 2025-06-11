@@ -1,6 +1,6 @@
-int half(int x)
+int times2(int x)
 {
-  return x / 2;
+  return x * 2;
 }
 
 int f()
@@ -10,5 +10,5 @@ int f()
 
 int main()
 {
-  return half(10) + f();
+  return times2(f()) + f();
 }
