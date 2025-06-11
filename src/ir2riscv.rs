@@ -59,6 +59,7 @@ pub fn ir2riscv(ir: String) -> String {
                 out += &code;
             }
         }
+        out += "\n";
     }
     out
 }
