@@ -16,9 +16,7 @@ fn main() -> Result<()> {
     let input = args.next().unwrap();
     args.next();
     let outfile = args.next().unwrap();
-
     let input = read_to_string(input)?;
-
     let mut ast = sysy::CompUnitParser::new().parse(&input).unwrap();
     println!("{:#?}", ast);
     let koopa_ir;
