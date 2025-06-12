@@ -48,9 +48,18 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
     let block_id = {
         let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
         *counter_guard += 1;
-        counter_guard.clone()
+        *counter_guard
     };
     let mut global_id_table = IdTable::new(None, block_id); // Global scope
+    out += "decl @getint(): i32\ndecl @getch(): i32\ndecl @getarray(*i32): i32\ndecl @putint(i32)\ndecl @putch(i32)\ndecl @putarray(i32, *i32)\ndecl @starttime()\ndecl @stoptime()\n";
+    global_id_table.insert("getint".to_string(), IdElement::Func("i32".to_string()));
+    global_id_table.insert("getch".to_string(), IdElement::Func("i32".to_string()));
+    global_id_table.insert("getarray".to_string(), IdElement::Func("i32".to_string()));
+    global_id_table.insert("putint".to_string(), IdElement::Func("void".to_string()));
+    global_id_table.insert("putch".to_string(), IdElement::Func("void".to_string()));
+    global_id_table.insert("putarray".to_string(), IdElement::Func("void".to_string()));
+    global_id_table.insert("starttime".to_string(), IdElement::Func("void".to_string()));
+    global_id_table.insert("stoptime".to_string(), IdElement::Func("void".to_string()));
     for func_def in ast.func_defs.iter_mut() {
         let func_type = match func_def.func_type {
             FuncType::Int => ": i32",

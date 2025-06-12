@@ -5,8 +5,11 @@ pub fn ir2riscv(ir: String) -> String {
     let driver = koopa::front::Driver::from(ir);
     let program = driver.generate_program().unwrap();
     for &func in program.func_layout() {
-        out += ".text\n";
         let func_data = program.func(func);
+        if func_data.layout().entry_bb().is_none() {
+            continue;
+        }
+        out += ".text\n";
         out += &format!(".globl {}\n", &func_data.name()[1..]);
         out += &format!("{}:\n", &func_data.name()[1..]);
         let mut stack_map: HashMap<koopa::ir::Value, String> = HashMap::new();
