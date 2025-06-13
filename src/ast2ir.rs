@@ -102,6 +102,40 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
                 out += st;
                 out += "}\n";
             }
+            CompItem::ConstDecl(const_defs) => {
+                for const_def in const_defs.iter() {
+                    let value = compute_expr(&const_def.value, &global_id_table);
+                    global_id_table.insert(const_def.id.clone(), IdElement::Const(value));
+                }
+            }
+
+            CompItem::VarDecl(var_defs) => {
+                for var_def in var_defs.iter() {
+                    global_id_table.insert(var_def.id.clone(), IdElement::Var("i32".to_string()));
+                    match &var_def.value {
+                        None => {
+                            out += &format!(
+                                "global @{} = alloc i32, zeroinit\n",
+                                global_id_table.get(&var_def.id).1
+                            );
+                        }
+                        Some(e) => {
+                            let (st, pos) = expr2ir(e, &global_id_table);
+                            let pos = if st == String::new() {
+                                pos.to_string()
+                            } else {
+                                format!("t{}", pos)
+                            };
+                            out += &st;
+                            out += &format!(
+                                "global @{} = alloc i32, {}\n",
+                                global_id_table.get(&var_def.id).1,
+                                pos
+                            );
+                        }
+                    }
+                }
+            }
             _ => todo!(),
         }
     }

@@ -4,6 +4,14 @@ pub fn ir2riscv(ir: String) -> String {
     let mut out = String::new();
     let driver = koopa::front::Driver::from(ir);
     let program = driver.generate_program().unwrap();
+    out += ".data\n";
+    for &inst in program.inst_layout() {
+        println!("inst: {:?}", program.borrow_value(inst).kind());
+        let name = &program.borrow_value(inst).name().clone().unwrap()[1..];
+        out += &format!(".globl {}\n", name);
+        out += &format!("{}:\n", name);
+        
+    }
     for &func in program.func_layout() {
         let func_data = program.func(func);
         if func_data.layout().entry_bb().is_none() {
