@@ -60,45 +60,50 @@ pub fn ast2ir(ast: &mut CompUnit) -> String {
     global_id_table.insert("putarray".to_string(), IdElement::Func("void".to_string()));
     global_id_table.insert("starttime".to_string(), IdElement::Func("void".to_string()));
     global_id_table.insert("stoptime".to_string(), IdElement::Func("void".to_string()));
-    for func_def in ast.func_defs.iter_mut() {
-        let func_type = match func_def.func_type {
-            FuncType::Int => ": i32",
-            FuncType::Void => "",
-        };
-        global_id_table.insert(
-            func_def.ident.clone(),
-            IdElement::Func(match func_def.func_type {
-                FuncType::Int => "i32".to_string(),
-                FuncType::Void => "void".to_string(),
-            }),
-        );
-        out += &format!("fun @{}(", &func_def.ident);
-        for i in 0..func_def.params.len() {
-            let param = &func_def.params[i];
-            out += &format!("@{}: {}", param.ident, param.kind);
-            if i < func_def.params.len() - 1 {
-                out += ", ";
+    for comp_item in ast.list.iter_mut() {
+        match comp_item {
+            CompItem::FuncDef(func_def) => {
+                let func_type = match func_def.func_type {
+                    FuncType::Int => ": i32",
+                    FuncType::Void => "",
+                };
+                global_id_table.insert(
+                    func_def.ident.clone(),
+                    IdElement::Func(match func_def.func_type {
+                        FuncType::Int => "i32".to_string(),
+                        FuncType::Void => "void".to_string(),
+                    }),
+                );
+                out += &format!("fun @{}(", &func_def.ident);
+                for i in 0..func_def.params.len() {
+                    let param = &func_def.params[i];
+                    out += &format!("@{}: {}", param.ident, param.kind);
+                    if i < func_def.params.len() - 1 {
+                        out += ", ";
+                    }
+                }
+                out += &format!("){} {{\n", func_type);
+                out += "%entry:\n";
+                let id = {
+                    let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
+                    *counter_guard += 1;
+                    *counter_guard
+                };
+                let mut table = IdTable::new(Some(&global_id_table), id);
+                for param in func_def.params.iter() {
+                    table.insert(param.ident.clone(), IdElement::Var(param.kind.clone()));
+                    out += &format!("@{} = alloc i32\n", table.get(&param.ident).1);
+                    out += &format!("store @{}, @{}\n", param.ident, table.get(&param.ident).1);
+                }
+                let (st, has_ret) = &block2ir(&mut func_def.block, &mut table, -1);
+                if !*has_ret {
+                    out += "ret\n";
+                }
+                out += st;
+                out += "}\n";
             }
+            _ => todo!(),
         }
-        out += &format!("){} {{\n", func_type);
-        out += "%entry:\n";
-        let id = {
-            let mut counter_guard = BLOCK_COUNTER.lock().unwrap();
-            *counter_guard += 1;
-            *counter_guard
-        };
-        let mut table = IdTable::new(Some(&global_id_table), id);
-        for param in func_def.params.iter() {
-            table.insert(param.ident.clone(), IdElement::Var(param.kind.clone()));
-            out += &format!("@{} = alloc i32\n", table.get(&param.ident).1);
-            out += &format!("store @{}, @{}\n", param.ident, table.get(&param.ident).1);
-        }
-        let (st, has_ret) = &block2ir(&mut func_def.block, &mut table, -1);
-        if !*has_ret {
-            out += "ret\n";
-        }
-        out += st;
-        out += "}\n";
     }
     out
 }

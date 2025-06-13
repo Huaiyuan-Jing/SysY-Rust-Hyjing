@@ -1,6 +1,13 @@
 #[derive(Debug)]
 pub struct CompUnit {
-    pub func_defs: Vec<FuncDef>,
+    pub list: Vec<CompItem>,
+}
+
+#[derive(Debug)]
+pub enum CompItem {
+    FuncDef(FuncDef),
+    ConstDecl(Vec<ConstDef>),
+    VarDecl(Vec<VarDef>),
 }
 
 #[derive(Debug)]
@@ -93,4 +100,3 @@ pub struct VarDef {
     pub id: String,
     pub value: Option<Expr>,
 }
-

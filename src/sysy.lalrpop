@@ -1,29 +1,35 @@
 use crate::ast::*;
 grammar;
 
-
-
 match {
     r"\s*" => {},
     r"//[^\n\r]*[\n\r]*" => {},  // comment for one line like //....
-    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => {}, // comment for multi line like /*....*/ (actually not true here because it uses greedy match)
+    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => {}, // comment for multi line like /*....*/
     _
 }
 
-pub CompUnit: CompUnit = <func_defs: Repeat<FuncDef>> => CompUnit{ <> };
+pub CompUnit: CompUnit = <list:Repeat<CompItem>> => CompUnit{ <> };
+
+CompItem: CompItem = {
+    <f: FuncDef> => CompItem::FuncDef(f),
+    <cs: ConstDecl> => CompItem::ConstDecl(cs),
+    <vs: VarDecl> => CompItem::VarDecl(vs),
+};
 
 FuncDef: FuncDef = {
-    <func_type: FuncType> <ident: Ident> "(" <params: Comma<FuncFParam>> ")" <block: Block> => {
-        FuncDef { <> }
-    }
-}
+    <head: FuncDefHead> ")" <block: Block> => FuncDef {func_type: head.0, ident: head.1, block: block, params: Vec::new()},
+    <head: FuncDefHead> <init: FuncFParam> <mut params: ("," <FuncFParam>)*> ")" <block: Block> => {
+        params.insert(0, init);
+        FuncDef { func_type: head.0, ident: head.1, block: block, params: params }
+    },
+};
 
-FuncType: FuncType = {
-    "int" => FuncType::Int,
-    "void" => FuncType::Void,
-}
+FuncDefHead: (FuncType, String) = {
+    "void" <ident: Ident> "(" => (FuncType::Void, <>),
+    "int" <ident: Ident> "(" => (FuncType::Int, <>),
+};
 
-FuncFParam: FuncParam = <kind: BType> <ident: Ident> => FuncParam{ <> };
+FuncFParam: FuncParam = "int" <ident: Ident> => FuncParam{ kind: "i32".to_string(), ident: ident };
 
 Block: Block = "{" <items: Repeat<BlockItem>> "}" => {
     Block { items: items }
@@ -54,14 +60,12 @@ BlockItem: BlockItem = {
     <v: VarDecl> => BlockItem::VarDecl(v),
 };
 
-ConstDecl: Vec<ConstDef> = "const" <tp: BType> <mut l: Comma<ConstDef>> ";" => {
+ConstDecl: Vec<ConstDef> = "const" "int" <mut l: Comma<ConstDef>> ";" => {
     for i in 0..l.len() {
-        l[i].kind = tp.clone();
+        l[i].kind = "i32".to_string();
     }
     l
 };
-
-BType: String = "int" => "i32".to_string();
 
 ConstDef: ConstDef = <id: Ident> "=" <val: ConstInitVal> => ConstDef { kind: String::new(), id: id, value: val };
 
@@ -69,9 +73,10 @@ ConstInitVal: Expr = <e: ConstExp> => <>;
 
 ConstExp: Expr = <e: Expr> => <>;
 
-VarDecl: Vec<VarDef> = <tp: BType> <mut l: Comma<VarDef>> ";" => {
+VarDecl: Vec<VarDef> = "int" <init: VarDef> <mut l: (", " <VarDef>)*> ";" => {
+    l.insert(0, init);
     for i in 0..l.len() {
-        l[i].kind = tp.clone();
+        l[i].kind = String::from("i32");
     }
     l
 };
@@ -98,7 +103,7 @@ MatchedStmt: Stmt = {
     "return" <e: Opt<Expr>> ";" => Stmt::Ret(e),
     "while" "(" <cond: Expr> ")" <body: MatchedStmt> => Stmt::While(cond, Box::new(body)),
     "break" ";" => Stmt::Break,
-    "continue" ";" => Stmt::Continue,
+    "continue" ";" => Stmt::Continue,   
 }
 
 OpenStmt: Stmt = {
